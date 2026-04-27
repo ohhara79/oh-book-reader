@@ -1,0 +1,35 @@
+{
+  "name": "oh-book-reader",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\""
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.119",
+    "katex": "^0.16.45",
+    "next": "16.2.4",
+    "pdfjs-dist": "^5.6.205",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-katex": "^3.1.0",
+    "react-markdown": "^10.1.0",
+    "react-pdf": "^10.4.1",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/react-katex": "^3.0.4",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

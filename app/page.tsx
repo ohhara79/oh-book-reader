@@ -1,0 +1,89 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+
+type Book = {
+  id: string;
+  title: string;
+  filename: string;
+  page_count: number;
+  uploaded_at: number;
+};
+
+export default function Library() {
+  const [books, setBooks] = useState<Book[] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function refresh() {
+    const r = await fetch("/api/books");
+    const j = (await r.json()) as { books: Book[] };
+    setBooks(j.books);
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/books", { method: "POST", body: fd });
+      if (!r.ok) {
+        alert(`upload failed: ${r.status} ${await r.text()}`);
+        return;
+      }
+      await refresh();
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl px-6 py-12">
+      <header className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">oh-book-reader</h1>
+        <label className="cursor-pointer rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300">
+          {uploading ? "Uploading…" : "Upload PDF"}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            disabled={uploading}
+            onChange={onUpload}
+          />
+        </label>
+      </header>
+
+      {books === null ? (
+        <p className="text-zinc-500">Loading…</p>
+      ) : books.length === 0 ? (
+        <p className="text-zinc-500">No books yet. Upload a PDF to start.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {books.map((b) => (
+            <li key={b.id} className="py-3">
+              <Link
+                href={`/books/${b.id}`}
+                className="flex items-baseline justify-between hover:underline"
+              >
+                <span className="font-medium">{b.title}</span>
+                <span className="text-xs text-zinc-500">
+                  {b.page_count} pages ·{" "}
+                  {new Date(b.uploaded_at).toLocaleDateString()}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
+  );
+}

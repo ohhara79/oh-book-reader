@@ -110,6 +110,10 @@ export async function saveBook(
   await writeJsonAtomic(metaPath(meta.id), meta);
 }
 
+export async function deleteBook(bookId: string): Promise<void> {
+  await fs.rm(bookDir(bookId), { recursive: true, force: true });
+}
+
 export function getBookPdfPath(bookId: string): string {
   return pdfPath(bookId);
 }

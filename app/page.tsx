@@ -14,6 +14,7 @@ type Book = {
 export default function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -25,6 +26,31 @@ export default function Library() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  async function onDelete(book: Book) {
+    if (
+      !window.confirm(
+        `Delete "${book.title}"? This also removes all selections and conversations.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting((prev) => new Set(prev).add(book.id));
+    try {
+      const r = await fetch(`/api/books/${book.id}`, { method: "DELETE" });
+      if (!r.ok) {
+        alert(`delete failed: ${r.status} ${await r.text()}`);
+        return;
+      }
+      await refresh();
+    } finally {
+      setDeleting((prev) => {
+        const next = new Set(prev);
+        next.delete(book.id);
+        return next;
+      });
+    }
+  }
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -68,20 +94,34 @@ export default function Library() {
         <p className="text-zinc-500">No books yet. Upload a PDF to start.</p>
       ) : (
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {books.map((b) => (
-            <li key={b.id} className="py-3">
-              <Link
-                href={`/books/${b.id}`}
-                className="flex items-baseline justify-between hover:underline"
+          {books.map((b) => {
+            const isDeleting = deleting.has(b.id);
+            return (
+              <li
+                key={b.id}
+                className="flex items-baseline justify-between gap-4 py-3"
               >
-                <span className="font-medium">{b.title}</span>
-                <span className="text-xs text-zinc-500">
+                <Link
+                  href={`/books/${b.id}`}
+                  className="min-w-0 flex-1 truncate font-medium hover:underline"
+                >
+                  {b.title}
+                </Link>
+                <span className="shrink-0 text-xs text-zinc-500">
                   {b.page_count} pages ·{" "}
                   {new Date(b.uploaded_at).toLocaleDateString()}
                 </span>
-              </Link>
-            </li>
-          ))}
+                <button
+                  type="button"
+                  onClick={() => onDelete(b)}
+                  disabled={isDeleting}
+                  className="shrink-0 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-zinc-800"
+                >
+                  {isDeleting ? "Deleting…" : "Delete"}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </main>

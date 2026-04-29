@@ -43,6 +43,7 @@ export default function ConversationPanel({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const newConvSentRef = useRef(false);
@@ -53,6 +54,7 @@ export default function ConversationPanel({
     setMessages([]);
     setQuestion("");
     setConversationId(null);
+    setDeleting(false);
     newConvSentRef.current = false;
 
     if (!active) return;
@@ -165,6 +167,34 @@ export default function ConversationPanel({
     }
   }
 
+  async function deleteConversation() {
+    if (!conversationId || streaming || deleting) return;
+    if (
+      !window.confirm(
+        "Delete this conversation? The pin on the page will also be removed.",
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/conversations/${conversationId}`, {
+        method: "DELETE",
+      });
+      if (!r.ok) {
+        setError(`failed to delete: ${r.status}`);
+        setDeleting(false);
+        return;
+      }
+      onCreated();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setDeleting(false);
+    }
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const q = question.trim();
@@ -191,13 +221,25 @@ export default function ConversationPanel({
               : "Ask Claude"}
         </span>
         {active && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-3">
+            {active.kind === "existing" && conversationId && (
+              <button
+                type="button"
+                onClick={deleteConversation}
+                disabled={streaming || deleting}
+                className="text-red-600 hover:text-red-800 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              Close
+            </button>
+          </div>
         )}
       </div>
 

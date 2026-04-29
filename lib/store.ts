@@ -205,6 +205,25 @@ export async function saveConversation(
   );
 }
 
+export async function deleteConversation(
+  bookId: string,
+  conversationId: string,
+): Promise<void> {
+  await fs.rm(
+    path.join(conversationsDir(bookId), `${conversationId}.json`),
+    { force: true },
+  );
+}
+
+export async function deleteSelection(
+  bookId: string,
+  selectionId: string,
+): Promise<void> {
+  const base = path.join(selectionsDir(bookId), selectionId);
+  await fs.rm(`${base}.json`, { force: true });
+  await fs.rm(`${base}.png`, { force: true });
+}
+
 export async function findConversationBookId(
   conversationId: string,
 ): Promise<string | null> {

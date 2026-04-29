@@ -45,6 +45,7 @@ export default function SelectionOverlay({
   onPinClick,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dragMovedRef = useRef(false);
   const [drag, setDrag] = useState<Drag | null>(null);
 
   function clientToOverlay(clientX: number, clientY: number) {
@@ -55,6 +56,7 @@ export default function SelectionOverlay({
   function onMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     const { x, y } = clientToOverlay(e.clientX, e.clientY);
+    dragMovedRef.current = false;
     setDrag({ startX: x, startY: y, x, y, w: 0, h: 0 });
   }
 
@@ -65,6 +67,9 @@ export default function SelectionOverlay({
     const y = Math.min(drag.startY, cy);
     const w = Math.abs(cx - drag.startX);
     const h = Math.abs(cy - drag.startY);
+    if (w >= MIN_DRAG_PX || h >= MIN_DRAG_PX) {
+      dragMovedRef.current = true;
+    }
     setDrag({ ...drag, x, y, w, h });
   }
 
@@ -187,9 +192,13 @@ export default function SelectionOverlay({
             width: s.bbox[2] * scale,
             height: s.bbox[3] * scale,
           }}
-          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
+            if (dragMovedRef.current) {
+              e.preventDefault();
+              dragMovedRef.current = false;
+              return;
+            }
             onPinClick(s.id);
           }}
         />

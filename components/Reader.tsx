@@ -45,6 +45,13 @@ const SIDEBAR_MIN = 320;
 const SIDEBAR_MAX_HARD = 1200;
 const SIDEBAR_WIDTH_KEY = "ohbr.sidebarWidth";
 const SIDEBAR_HIDDEN_KEY = "ohbr.sidebarHidden";
+const LAST_BOOK_KEY = "ohbr.lastBookId";
+const bookStateKey = (id: string) => `ohbr.book.${id}`;
+
+const DEFAULT_PAGE = 1;
+const DEFAULT_SCALE = 1.4;
+const SCALE_MIN = 0.5;
+const SCALE_MAX = 3;
 
 function clampSidebarWidth(w: number) {
   const max = Math.min(
@@ -54,10 +61,24 @@ function clampSidebarWidth(w: number) {
   return Math.min(Math.max(w, SIDEBAR_MIN), max);
 }
 
+type StoredBookState = { page?: number; scale?: number };
+
+function readBookState(id: string): StoredBookState | null {
+  try {
+    const raw = localStorage.getItem(bookStateKey(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as StoredBookState;
+  } catch {
+    return null;
+  }
+}
+
 export default function Reader({ bookId }: { bookId: string }) {
   const [book, setBook] = useState<Book | null>(null);
-  const [pageNum, setPageNum] = useState(1);
-  const [scale, setScale] = useState(1.4);
+  const [pageNum, setPageNum] = useState(DEFAULT_PAGE);
+  const [scale, setScale] = useState(DEFAULT_SCALE);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [selections, setSelections] = useState<Sel[]>([]);
   const [convsBySelection, setConvsBySelection] =
@@ -89,8 +110,21 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
     const h = localStorage.getItem(SIDEBAR_HIDDEN_KEY);
     if (h === "1") setSidebarHidden(true);
+
+    const stored = readBookState(bookId);
+    if (stored) {
+      if (Number.isFinite(stored.page) && (stored.page as number) >= 1) {
+        setPageNum(Math.floor(stored.page as number));
+      }
+      if (Number.isFinite(stored.scale)) {
+        setScale(
+          Math.min(SCALE_MAX, Math.max(SCALE_MIN, stored.scale as number)),
+        );
+      }
+    }
+    localStorage.setItem(LAST_BOOK_KEY, bookId);
     setHydrated(true);
-  }, []);
+  }, [bookId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -101,6 +135,19 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (!hydrated) return;
     localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden ? "1" : "0");
   }, [sidebarHidden, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(
+      bookStateKey(bookId),
+      JSON.stringify({ page: pageNum, scale }),
+    );
+  }, [bookId, pageNum, scale, hydrated]);
+
+  useEffect(() => {
+    if (numPages == null) return;
+    setPageNum((n) => Math.min(Math.max(1, n), numPages));
+  }, [numPages]);
 
   const refreshSelections = useCallback(async () => {
     const r = await fetch(`/api/books/${bookId}/selections`);

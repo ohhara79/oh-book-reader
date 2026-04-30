@@ -240,7 +240,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-auto bg-zinc-100 p-6 dark:bg-zinc-900">
+        <main className="flex-1 overflow-auto bg-zinc-100 p-6 text-center dark:bg-zinc-900">
           <div ref={pageWrapperRef} className="mx-auto inline-block relative">
             <Document
               file={fileProp}

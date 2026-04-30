@@ -49,6 +49,7 @@ export default function SelectionOverlay({
   const overlayRef = useRef<HTMLDivElement>(null);
   const dragMovedRef = useRef(false);
   const armedRef = useRef(false);
+  const capturedRef = useRef(false);
   const pointerIdRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -85,6 +86,7 @@ export default function SelectionOverlay({
   function resetGesture() {
     clearLongPress();
     armedRef.current = false;
+    capturedRef.current = false;
     pointerIdRef.current = null;
     pointerStartRef.current = null;
   }
@@ -102,6 +104,7 @@ export default function SelectionOverlay({
         longPressTimerRef.current = null;
         try {
           target.setPointerCapture(pointerId);
+          capturedRef.current = true;
         } catch {
           // pointer may no longer be active; safe to ignore
         }
@@ -111,11 +114,6 @@ export default function SelectionOverlay({
         armSelection(clientX, clientY, pointerId);
       }, LONG_PRESS_MS);
     } else {
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        // ignore
-      }
       armSelection(e.clientX, e.clientY, e.pointerId);
     }
   }
@@ -152,6 +150,14 @@ export default function SelectionOverlay({
     const h = Math.abs(cy - drag.startY);
     if (w >= MIN_DRAG_PX || h >= MIN_DRAG_PX) {
       dragMovedRef.current = true;
+      if (!capturedRef.current) {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          capturedRef.current = true;
+        } catch {
+          // ignore
+        }
+      }
     }
     setDrag({ ...drag, x, y, w, h });
   }

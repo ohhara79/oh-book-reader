@@ -272,7 +272,7 @@ export default function SelectionOverlay({
     <div
       ref={overlayRef}
       className="absolute inset-0 select-none md:cursor-crosshair"
-      style={{ zIndex: 10, touchAction: "pan-y pinch-zoom" }}
+      style={{ zIndex: 10, touchAction: "pan-x pan-y pinch-zoom" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

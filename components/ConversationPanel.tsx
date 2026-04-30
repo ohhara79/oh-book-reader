@@ -319,7 +319,7 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
         className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700"
       />
       {capture.selectionText && (
-        <p className="mt-2 line-clamp-3 text-xs text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
           {capture.selectionText}
         </p>
       )}

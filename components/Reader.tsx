@@ -145,15 +145,15 @@ export default function Reader({ bookId }: { bookId: string }) {
     setSidebarWidth(clampSidebarWidth(window.innerWidth - clientX));
   }, []);
 
-  const asideClass = [
-    active
-      ? "fixed inset-0 z-50 md:static md:z-auto"
-      : "hidden md:block",
-    sidebarHidden ? "md:hidden" : "",
-    "w-full overflow-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black md:shrink-0 md:w-[var(--sidebar-w)]",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const overlayOnDesktop = !!active && sidebarHidden;
+  const layoutClass = active
+    ? overlayOnDesktop
+      ? "fixed inset-0 z-50"
+      : "fixed inset-0 z-50 md:static md:z-auto md:shrink-0 md:w-[var(--sidebar-w)]"
+    : sidebarHidden
+      ? "hidden"
+      : "hidden md:block md:shrink-0 md:w-[var(--sidebar-w)]";
+  const asideClass = `${layoutClass} w-full overflow-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black`;
 
   const asideStyle = {
     ["--sidebar-w" as string]: `${sidebarWidth}px`,

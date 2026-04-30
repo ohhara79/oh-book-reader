@@ -227,7 +227,7 @@ export default function ConversationPanel({
                 type="button"
                 onClick={deleteConversation}
                 disabled={streaming || deleting}
-                className="text-red-600 hover:text-red-800 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+                className="-mx-1 -my-1 px-3 py-2 text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:p-0 dark:text-red-400 dark:hover:text-red-300"
               >
                 {deleting ? "Deleting…" : "Delete"}
               </button>
@@ -235,9 +235,10 @@ export default function ConversationPanel({
             <button
               type="button"
               onClick={onClose}
-              className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 md:p-0 dark:hover:text-zinc-100"
             >
-              Close
+              <span className="md:hidden">← Back</span>
+              <span className="hidden md:inline">Close</span>
             </button>
           </div>
         )}
@@ -246,9 +247,9 @@ export default function ConversationPanel({
       <div ref={scrollerRef} className="flex-1 overflow-auto px-4 py-3">
         {isEmpty ? (
           <p className="text-sm text-zinc-500">
-            Drag a rectangle over a region of the page to ask Claude about it.
-            Your previous Q&A appear as amber pins on the page — click any pin
-            to reopen the conversation.
+            Drag a rectangle (or press and hold on touch) over a region of the
+            page to ask Claude about it. Your previous Q&A appear as amber pins
+            on the page — tap any pin to reopen the conversation.
           </p>
         ) : (
           <div className="space-y-4">
@@ -294,7 +295,7 @@ export default function ConversationPanel({
             <button
               type="submit"
               disabled={streaming || !question.trim()}
-              className="rounded bg-zinc-900 px-3 py-1 text-sm text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-black"
+              className="rounded bg-zinc-900 px-4 py-2 text-sm text-white active:bg-zinc-700 disabled:opacity-50 md:px-3 md:py-1 dark:bg-zinc-100 dark:text-black dark:active:bg-zinc-300"
             >
               {streaming ? "Asking…" : "Ask"}
             </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type CapturedSelection = {
   page: number;
@@ -36,6 +36,8 @@ type Drag = {
 };
 
 const MIN_DRAG_PX = 8;
+const LONG_PRESS_MS = 400;
+const TOUCH_CANCEL_MOVE_PX = 10;
 
 export default function SelectionOverlay({
   pageNumber,
@@ -46,21 +48,102 @@ export default function SelectionOverlay({
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const dragMovedRef = useRef(false);
+  const armedRef = useRef(false);
+  const pointerIdRef = useRef<number | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   function clientToOverlay(clientX: number, clientY: number) {
     const r = overlayRef.current!.getBoundingClientRect();
     return { x: clientX - r.left, y: clientY - r.top };
   }
 
-  function onMouseDown(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.button !== 0) return;
-    const { x, y } = clientToOverlay(e.clientX, e.clientY);
+  function armSelection(clientX: number, clientY: number, pointerId: number) {
+    const { x, y } = clientToOverlay(clientX, clientY);
+    armedRef.current = true;
+    pointerIdRef.current = pointerId;
     dragMovedRef.current = false;
     setDrag({ startX: x, startY: y, x, y, w: 0, h: 0 });
   }
 
-  function onMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+  function clearLongPress() {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function resetGesture() {
+    clearLongPress();
+    armedRef.current = false;
+    pointerIdRef.current = null;
+    pointerStartRef.current = null;
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!e.isPrimary) return;
+    if (e.button !== 0) return;
+    if (e.pointerType === "touch") {
+      pointerStartRef.current = { x: e.clientX, y: e.clientY };
+      pointerIdRef.current = e.pointerId;
+      const { clientX, clientY, pointerId } = e;
+      const target = e.currentTarget;
+      clearLongPress();
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        try {
+          target.setPointerCapture(pointerId);
+        } catch {
+          // pointer may no longer be active; safe to ignore
+        }
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+          navigator.vibrate?.(20);
+        }
+        armSelection(clientX, clientY, pointerId);
+      }, LONG_PRESS_MS);
+    } else {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      armSelection(e.clientX, e.clientY, e.pointerId);
+    }
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (
+      pointerIdRef.current !== null &&
+      e.pointerId !== pointerIdRef.current
+    ) {
+      return;
+    }
+    if (!armedRef.current) {
+      // Touch, pre-arm: cancel long-press if movement exceeds threshold so
+      // the browser keeps handling the gesture as a scroll.
+      if (longPressTimerRef.current !== null && pointerStartRef.current) {
+        const dx = e.clientX - pointerStartRef.current.x;
+        const dy = e.clientY - pointerStartRef.current.y;
+        if (
+          dx * dx + dy * dy >
+          TOUCH_CANCEL_MOVE_PX * TOUCH_CANCEL_MOVE_PX
+        ) {
+          clearLongPress();
+          pointerIdRef.current = null;
+          pointerStartRef.current = null;
+        }
+      }
+      return;
+    }
     if (!drag) return;
     const { x: cx, y: cy } = clientToOverlay(e.clientX, e.clientY);
     const x = Math.min(drag.startX, cx);
@@ -73,7 +156,16 @@ export default function SelectionOverlay({
     setDrag({ ...drag, x, y, w, h });
   }
 
-  async function onMouseUp() {
+  async function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (
+      pointerIdRef.current !== null &&
+      e.pointerId !== pointerIdRef.current
+    ) {
+      return;
+    }
+    const wasArmed = armedRef.current;
+    resetGesture();
+    if (!wasArmed) return;
     if (!drag) return;
     const sel = drag;
     setDrag(null);
@@ -159,15 +251,26 @@ export default function SelectionOverlay({
     });
   }
 
+  function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
+    if (
+      pointerIdRef.current !== null &&
+      e.pointerId !== pointerIdRef.current
+    ) {
+      return;
+    }
+    resetGesture();
+    setDrag(null);
+  }
+
   return (
     <div
       ref={overlayRef}
-      className="absolute inset-0 cursor-crosshair select-none"
-      style={{ zIndex: 10 }}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={() => setDrag(null)}
+      className="absolute inset-0 select-none md:cursor-crosshair"
+      style={{ zIndex: 10, touchAction: "pan-y pinch-zoom" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     >
       {drag && drag.w > 0 && drag.h > 0 && (
         <div
@@ -185,7 +288,7 @@ export default function SelectionOverlay({
           key={s.id}
           type="button"
           aria-label={`Open conversation for selection ${s.id}`}
-          className="absolute cursor-pointer border-2 border-amber-500 bg-amber-500/10 transition hover:bg-amber-500/25"
+          className="absolute cursor-pointer border-2 border-amber-500 bg-amber-500/10 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40"
           style={{
             left: s.bbox[0] * scale,
             top: s.bbox[1] * scale,

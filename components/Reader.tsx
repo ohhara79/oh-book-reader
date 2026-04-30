@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -33,6 +40,20 @@ type ActiveConversation =
   | { kind: "new"; capture: CapturedSelection }
   | { kind: "existing"; conversationId: string };
 
+const SIDEBAR_DEFAULT = 448;
+const SIDEBAR_MIN = 320;
+const SIDEBAR_MAX_HARD = 1200;
+const SIDEBAR_WIDTH_KEY = "ohbr.sidebarWidth";
+const SIDEBAR_HIDDEN_KEY = "ohbr.sidebarHidden";
+
+function clampSidebarWidth(w: number) {
+  const max = Math.min(
+    typeof window === "undefined" ? SIDEBAR_MAX_HARD : window.innerWidth * 0.6,
+    SIDEBAR_MAX_HARD,
+  );
+  return Math.min(Math.max(w, SIDEBAR_MIN), max);
+}
+
 export default function Reader({ bookId }: { bookId: string }) {
   const [book, setBook] = useState<Book | null>(null);
   const [pageNum, setPageNum] = useState(1);
@@ -42,6 +63,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [convsBySelection, setConvsBySelection] =
     useState<ConversationsBySelection>({});
   const [active, setActive] = useState<ActiveConversation | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const pageWrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +81,26 @@ export default function Reader({ bookId }: { bookId: string }) {
       cancelled = true;
     };
   }, [bookId]);
+
+  useEffect(() => {
+    const w = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    if (Number.isFinite(w) && w > 0) {
+      setSidebarWidth(clampSidebarWidth(w));
+    }
+    const h = localStorage.getItem(SIDEBAR_HIDDEN_KEY);
+    if (h === "1") setSidebarHidden(true);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+  }, [sidebarWidth, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden ? "1" : "0");
+  }, [sidebarHidden, hydrated]);
 
   const refreshSelections = useCallback(async () => {
     const r = await fetch(`/api/books/${bookId}/selections`);
@@ -97,23 +141,43 @@ export default function Reader({ bookId }: { bookId: string }) {
     [selections, pageNum],
   );
 
+  const onSplitterDrag = useCallback((clientX: number) => {
+    setSidebarWidth(clampSidebarWidth(window.innerWidth - clientX));
+  }, []);
+
+  const asideClass = [
+    active
+      ? "fixed inset-0 z-50 md:static md:z-auto"
+      : "hidden md:block",
+    sidebarHidden ? "md:hidden" : "",
+    "w-full overflow-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black md:shrink-0 md:w-[var(--sidebar-w)]",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const asideStyle = {
+    ["--sidebar-w" as string]: `${sidebarWidth}px`,
+  } as CSSProperties;
+
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-black">
-        <div className="flex items-center gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-y-1 border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-black">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
             href="/"
             className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
           >
-            ← Library
+            ←<span className="hidden md:inline"> Library</span>
           </Link>
-          <span className="font-medium">{book?.title ?? "Loading…"}</span>
+          <span className="block min-w-0 truncate font-medium">
+            {book?.title ?? "Loading…"}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-1 text-sm md:gap-2">
           <button
             type="button"
             onClick={goPrev}
-            className="rounded border px-2 py-1 disabled:opacity-50"
+            className="rounded border px-3 py-2 disabled:opacity-50 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
             disabled={pageNum <= 1}
           >
             Prev
@@ -137,7 +201,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <button
             type="button"
             onClick={goNext}
-            className="rounded border px-2 py-1 disabled:opacity-50"
+            className="rounded border px-3 py-2 disabled:opacity-50 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
             disabled={!!numPages && pageNum >= numPages}
           >
             Next
@@ -146,21 +210,32 @@ export default function Reader({ bookId }: { bookId: string }) {
             <button
               type="button"
               onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}
-              className="rounded border px-2 py-1"
+              className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
               aria-label="Zoom out"
             >
               −
             </button>
-            <span className="w-12 text-center">{Math.round(scale * 100)}%</span>
+            <span className="hidden text-center md:inline-block md:w-12">
+              {Math.round(scale * 100)}%
+            </span>
             <button
               type="button"
               onClick={() => setScale((s) => Math.min(3, s + 0.2))}
-              className="rounded border px-2 py-1"
+              className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
               aria-label="Zoom in"
             >
               +
             </button>
           </span>
+          <button
+            type="button"
+            onClick={() => setSidebarHidden((h) => !h)}
+            className="ml-3 hidden rounded border px-2 py-1 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:text-zinc-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            aria-label={sidebarHidden ? "Show conversation panel" : "Hide conversation panel"}
+            title={sidebarHidden ? "Show panel" : "Hide panel"}
+          >
+            {sidebarHidden ? "›" : "‹"}
+          </button>
         </div>
       </header>
 
@@ -199,7 +274,8 @@ export default function Reader({ bookId }: { bookId: string }) {
             </Document>
           </div>
         </main>
-        <aside className="w-[28rem] shrink-0 overflow-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
+        {!sidebarHidden && <Splitter onDrag={onSplitterDrag} />}
+        <aside className={asideClass} style={asideStyle}>
           <ConversationPanel
             key={
               active
@@ -216,5 +292,43 @@ export default function Reader({ bookId }: { bookId: string }) {
         </aside>
       </div>
     </div>
+  );
+}
+
+function Splitter({ onDrag }: { onDrag: (clientX: number) => void }) {
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      className="hidden w-1 shrink-0 cursor-col-resize bg-zinc-200 hover:bg-zinc-400 active:bg-zinc-500 md:block dark:bg-zinc-800 dark:hover:bg-zinc-600"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        const target = e.currentTarget;
+        const pointerId = e.pointerId;
+        try {
+          target.setPointerCapture(pointerId);
+        } catch {
+          // ignore
+        }
+        const move = (ev: PointerEvent) => {
+          if (ev.pointerId !== pointerId) return;
+          onDrag(ev.clientX);
+        };
+        const up = (ev: PointerEvent) => {
+          if (ev.pointerId !== pointerId) return;
+          try {
+            target.releasePointerCapture?.(pointerId);
+          } catch {
+            // ignore
+          }
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+          window.removeEventListener("pointercancel", up);
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        window.addEventListener("pointercancel", up);
+      }}
+    />
   );
 }

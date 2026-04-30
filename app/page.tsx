@@ -99,7 +99,7 @@ export default function Library() {
             return (
               <li
                 key={b.id}
-                className="flex items-baseline justify-between gap-4 py-3"
+                className="flex flex-col gap-1 py-3 md:flex-row md:items-baseline md:justify-between md:gap-4"
               >
                 <Link
                   href={`/books/${b.id}`}
@@ -107,18 +107,20 @@ export default function Library() {
                 >
                   {b.title}
                 </Link>
-                <span className="shrink-0 text-xs text-zinc-500">
-                  {b.page_count} pages ·{" "}
-                  {new Date(b.uploaded_at).toLocaleDateString()}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onDelete(b)}
-                  disabled={isDeleting}
-                  className="shrink-0 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-zinc-800"
-                >
-                  {isDeleting ? "Deleting…" : "Delete"}
-                </button>
+                <div className="flex items-center justify-between gap-3 md:contents">
+                  <span className="shrink-0 text-xs text-zinc-500">
+                    {b.page_count} pages ·{" "}
+                    {new Date(b.uploaded_at).toLocaleDateString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(b)}
+                    disabled={isDeleting}
+                    className="shrink-0 rounded px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-red-600 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+                  >
+                    {isDeleting ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
               </li>
             );
           })}

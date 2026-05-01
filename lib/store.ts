@@ -17,8 +17,8 @@ export type ContentBlock =
     };
 
 export type Turn =
-  | { role: "user"; content: ContentBlock[] }
-  | { role: "assistant"; content: ContentBlock[] }
+  | { role: "user"; content: ContentBlock[]; created_at?: number }
+  | { role: "assistant"; content: ContentBlock[]; created_at?: number }
   | { role: "memo"; text: string; created_at: number };
 
 export type BookMeta = {

@@ -134,10 +134,11 @@ export async function POST(req: NextRequest) {
         }
 
         await appendMessages(body.bookId, conversation.id, [
-          { role: "user", content: firstUserContent },
+          { role: "user", content: firstUserContent, created_at: now },
           {
             role: "assistant",
             content: [{ type: "text", text: assistantText }],
+            created_at: Date.now(),
           },
         ]);
         if (sessionId) {

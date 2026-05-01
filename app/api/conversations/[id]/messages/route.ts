@@ -89,6 +89,7 @@ export async function POST(
     followupContent = [...memoBlocks, questionBlock];
   }
 
+  const userCreatedAt = Date.now();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       controller.enqueue(
@@ -118,10 +119,15 @@ export async function POST(
         }
 
         await appendMessages(bookId, conv.id, [
-          { role: "user", content: followupContent },
+          {
+            role: "user",
+            content: followupContent,
+            created_at: userCreatedAt,
+          },
           {
             role: "assistant",
             content: [{ type: "text", text: assistantText }],
+            created_at: Date.now(),
           },
         ]);
         if (sessionId && sessionId !== conv.session_id) {

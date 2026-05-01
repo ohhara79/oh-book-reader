@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
+import { formatTimestamp } from "@/lib/formatTimestamp";
 
 type Turn =
-  | { role: "user"; content: ContentBlock[] }
-  | { role: "assistant"; content: ContentBlock[] }
+  | { role: "user"; content: ContentBlock[]; created_at?: number }
+  | { role: "assistant"; content: ContentBlock[]; created_at?: number }
   | { role: "memo"; text: string; created_at: number };
 
 type ContentBlock =
@@ -32,6 +33,7 @@ type DisplayMessage =
       role: "user" | "assistant";
       text: string;
       imagePreviewDataUrls?: string[];
+      created_at?: number;
     }
   | {
       role: "memo";
@@ -75,10 +77,16 @@ export default function ConversationPanel({
           return;
         }
         const j = (await r.json()) as {
-          conversation: { id: string; messages: Turn[] };
+          conversation: {
+            id: string;
+            created_at: number;
+            messages: Turn[];
+          };
         };
         setConversationId(j.conversation.id);
-        setMessages(turnsToDisplay(j.conversation.messages));
+        setMessages(
+          turnsToDisplay(j.conversation.messages, j.conversation.created_at),
+        );
       })();
     }
   }, [active]);
@@ -93,6 +101,7 @@ export default function ConversationPanel({
   async function startNewConversationAsk(cap: CapturedSelection, q: string) {
     setStreaming(true);
     setError(null);
+    const askedAt = Date.now();
     setMessages((prev) => [
       ...prev,
       {
@@ -101,6 +110,7 @@ export default function ConversationPanel({
         imagePreviewDataUrls: cap.spans.map(
           (s) => `data:${s.imageMediaType};base64,${s.imageBase64}`,
         ),
+        created_at: askedAt,
       },
       { role: "assistant", text: "" },
     ]);
@@ -129,7 +139,11 @@ export default function ConversationPanel({
             const next = [...prev];
             const last = next[next.length - 1];
             if (last && last.role === "assistant") {
-              next[next.length - 1] = { ...last, text: last.text + chunk };
+              next[next.length - 1] = {
+                ...last,
+                text: last.text + chunk,
+                created_at: last.created_at ?? Date.now(),
+              };
             }
             return next;
           }),
@@ -214,9 +228,10 @@ export default function ConversationPanel({
     if (!conversationId) return;
     setStreaming(true);
     setError(null);
+    const askedAt = Date.now();
     setMessages((prev) => [
       ...prev,
-      { role: "user", text: q },
+      { role: "user", text: q, created_at: askedAt },
       { role: "assistant", text: "" },
     ]);
     try {
@@ -234,7 +249,11 @@ export default function ConversationPanel({
             const next = [...prev];
             const last = next[next.length - 1];
             if (last && last.role === "assistant") {
-              next[next.length - 1] = { ...last, text: last.text + chunk };
+              next[next.length - 1] = {
+                ...last,
+                text: last.text + chunk,
+                created_at: last.created_at ?? Date.now(),
+              };
             }
             return next;
           }),
@@ -464,13 +483,6 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
   );
 }
 
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const hh = d.getHours().toString().padStart(2, "0");
-  const mm = d.getMinutes().toString().padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
 function MessageBubble({
   m,
   streaming,
@@ -482,7 +494,7 @@ function MessageBubble({
     return (
       <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
         <p className="mb-1 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
-          memo · {formatTime(m.created_at)}
+          memo · {formatTimestamp(m.created_at)}
         </p>
         <MathMarkdown text={m.text} />
       </div>
@@ -498,6 +510,11 @@ function MessageBubble({
           : "mr-6 bg-blue-50 dark:bg-blue-950/50"
       }`}
     >
+      {m.created_at != null && (
+        <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+          {isUser ? "ask" : "claude"} · {formatTimestamp(m.created_at)}
+        </p>
+      )}
       {images.length > 0 && (
         <div className="mb-2 space-y-1">
           {images.map((src, i) => (
@@ -525,7 +542,10 @@ function MessageBubble({
   );
 }
 
-function turnsToDisplay(turns: Turn[]): DisplayMessage[] {
+function turnsToDisplay(
+  turns: Turn[],
+  fallbackCreatedAt: number,
+): DisplayMessage[] {
   return turns.map((t): DisplayMessage => {
     if (t.role === "memo") {
       return { role: "memo", text: t.text, created_at: t.created_at };
@@ -552,6 +572,7 @@ function turnsToDisplay(turns: Turn[]): DisplayMessage[] {
       text,
       imagePreviewDataUrls:
         imagePreviewDataUrls.length > 0 ? imagePreviewDataUrls : undefined,
+      created_at: t.created_at ?? fallbackCreatedAt,
     };
   });
 }

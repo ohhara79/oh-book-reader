@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { formatTimestamp } from "@/lib/formatTimestamp";
 
 type Book = {
   id: string;
@@ -112,8 +113,7 @@ export default function Library() {
                 </Link>
                 <div className="flex items-center justify-between gap-3 md:contents">
                   <span className="shrink-0 text-xs text-zinc-500">
-                    {b.page_count} pages ·{" "}
-                    {new Date(b.uploaded_at).toLocaleDateString()}
+                    {b.page_count} pages · {formatTimestamp(b.uploaded_at)}
                   </span>
                   <button
                     type="button"

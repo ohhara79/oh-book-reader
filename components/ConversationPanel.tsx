@@ -372,9 +372,7 @@ export default function ConversationPanel({
           </p>
         ) : (
           <div className="space-y-4">
-            {active?.kind === "new" && messages.length === 0 && (
-              <PreviewBox capture={active.capture} />
-            )}
+            {active?.kind === "new" && <PreviewBox capture={active.capture} />}
             {messages.map((m, i) => (
               <MessageBubble
                 key={i}

@@ -26,7 +26,7 @@ function pageLabel(spans: CapturedSelection["spans"]): string {
   return first === last ? `page ${first}` : `pages ${first}–${last}`;
 }
 
-function selectionSection(capture: CapturedSelection | null): string {
+export function selectionSection(capture: CapturedSelection | null): string {
   if (!capture || capture.spans.length === 0) return "";
   const lines: string[] = [];
   lines.push(`## Selected region — ${pageLabel(capture.spans)}`);

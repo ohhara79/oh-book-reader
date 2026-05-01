@@ -9,6 +9,7 @@ import type { Conversation } from "@/lib/store";
 import {
   conversationToMarkdown,
   extractUserQuestion,
+  selectionSection,
 } from "@/lib/exportConversation";
 import {
   conversationFilename,
@@ -543,17 +544,14 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
     capture.spans.length === 1
       ? `page ${first.page}`
       : `pages ${first.page}–${last.page}`;
-  const selectedText = capture.spans
-    .map((s) => s.selectionText)
-    .filter((t) => t && t.length > 0)
-    .join("\n\n");
+  const copyMarkdown = selectionSection(capture);
   return (
     <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-zinc-500">
           Selected region · {label}
         </p>
-        <CopyButton text={selectedText} title="Copy selection text" />
+        <CopyButton text={copyMarkdown} title="Copy selection (image + text)" />
       </div>
       <div className="space-y-2">
         {capture.spans.map((s, i) => (

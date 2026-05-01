@@ -4,7 +4,9 @@ import {
   deleteSelection,
   findConversationBookId,
   getConversation,
+  getSelection,
   listConversationsForBook,
+  readSelectionImage,
 } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -19,7 +21,35 @@ export async function GET(
   const bookId = await findConversationBookId(id);
   if (!bookId) return new Response("not found", { status: 404 });
   const conv = await getConversation(bookId, id);
-  return NextResponse.json({ bookId, conversation: conv });
+  let capture: {
+    spans: {
+      page: number;
+      bbox: [number, number, number, number];
+      imageBase64: string;
+      imageMediaType: "image/png";
+      selectionText: string;
+      surroundingText: string;
+    }[];
+  } | null = null;
+  try {
+    const selection = await getSelection(bookId, conv.selection_id);
+    const spans = await Promise.all(
+      selection.spans.map(async (s, i) => ({
+        page: s.page,
+        bbox: s.bbox,
+        imageBase64: (
+          await readSelectionImage(bookId, conv.selection_id, i)
+        ).toString("base64"),
+        imageMediaType: "image/png" as const,
+        selectionText: s.extracted_text,
+        surroundingText: s.surrounding_text,
+      })),
+    );
+    capture = { spans };
+  } catch {
+    // selection missing or unreadable — omit capture, conversation still loads
+  }
+  return NextResponse.json({ bookId, conversation: conv, capture });
 }
 
 export async function DELETE(

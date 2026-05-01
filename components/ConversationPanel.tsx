@@ -49,6 +49,8 @@ export default function ConversationPanel({
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [existingCapture, setExistingCapture] =
+    useState<CapturedSelection | null>(null);
   const [question, setQuestion] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -63,6 +65,7 @@ export default function ConversationPanel({
     setMessages([]);
     setQuestion("");
     setConversationId(null);
+    setExistingCapture(null);
     setDeleting(false);
     setPosting(false);
     newConvSentRef.current = false;
@@ -82,11 +85,13 @@ export default function ConversationPanel({
             created_at: number;
             messages: Turn[];
           };
+          capture: CapturedSelection | null;
         };
         setConversationId(j.conversation.id);
         setMessages(
           turnsToDisplay(j.conversation.messages, j.conversation.created_at),
         );
+        if (j.capture) setExistingCapture(j.capture);
       })();
     }
   }, [active]);
@@ -373,6 +378,9 @@ export default function ConversationPanel({
         ) : (
           <div className="space-y-4">
             {active?.kind === "new" && <PreviewBox capture={active.capture} />}
+            {active?.kind === "existing" && existingCapture && (
+              <PreviewBox capture={existingCapture} />
+            )}
             {messages.map((m, i) => (
               <MessageBubble
                 key={i}

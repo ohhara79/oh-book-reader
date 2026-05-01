@@ -517,7 +517,7 @@ function MessageBubble({
         </p>
       )}
       {isUser ? (
-        <p className="whitespace-pre-wrap">{m.text}</p>
+        <MathMarkdown text={m.text} />
       ) : (
         <>
           <MathMarkdown text={m.text || (streaming ? "…" : "")} />

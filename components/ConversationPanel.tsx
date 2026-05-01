@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
+import CopyButton from "./CopyButton";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 
 type Turn =
@@ -454,11 +455,18 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
     capture.spans.length === 1
       ? `page ${first.page}`
       : `pages ${first.page}–${last.page}`;
+  const selectedText = capture.spans
+    .map((s) => s.selectionText)
+    .filter((t) => t && t.length > 0)
+    .join("\n\n");
   return (
     <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="mb-2 text-xs uppercase tracking-wide text-zinc-500">
-        Selected region · {label}
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-wide text-zinc-500">
+          Selected region · {label}
+        </p>
+        <CopyButton text={selectedText} title="Copy selection text" />
+      </div>
       <div className="space-y-2">
         {capture.spans.map((s, i) => (
           <div key={i}>
@@ -495,9 +503,12 @@ function MessageBubble({
   if (m.role === "memo") {
     return (
       <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
-        <p className="mb-1 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
-          memo · {formatTimestamp(m.created_at)}
-        </p>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <p className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
+            memo · {formatTimestamp(m.created_at)}
+          </p>
+          <CopyButton text={m.text} />
+        </div>
         <MathMarkdown text={m.text} />
       </div>
     );
@@ -511,11 +522,16 @@ function MessageBubble({
           : "mr-6 bg-blue-50 dark:bg-blue-950/50"
       }`}
     >
-      {m.created_at != null && (
-        <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
-          {isUser ? "ask" : "claude"} · {formatTimestamp(m.created_at)}
-        </p>
-      )}
+      <div className="mb-1 flex items-center justify-between gap-2">
+        {m.created_at != null ? (
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+            {isUser ? "ask" : "claude"} · {formatTimestamp(m.created_at)}
+          </p>
+        ) : (
+          <span />
+        )}
+        <CopyButton text={m.text} />
+      </div>
       {isUser ? (
         <MathMarkdown text={m.text} />
       ) : (

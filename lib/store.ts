@@ -29,15 +29,50 @@ export type BookMeta = {
   uploaded_at: number;
 };
 
-export type Selection = {
-  id: string;
-  book_id: string;
+export type SelectionSpan = {
   page: number;
   bbox: [number, number, number, number];
   extracted_text: string;
   surrounding_text: string;
+};
+
+export type Selection = {
+  id: string;
+  book_id: string;
+  spans: SelectionSpan[];
   created_at: number;
 };
+
+type LegacySelectionRaw = {
+  id: string;
+  book_id: string;
+  page: number;
+  bbox: [number, number, number, number];
+  extracted_text?: string;
+  surrounding_text?: string;
+  created_at: number;
+};
+
+function normalizeSelection(raw: unknown): Selection {
+  const r = raw as Selection | LegacySelectionRaw;
+  if (Array.isArray((r as Selection).spans)) {
+    return r as Selection;
+  }
+  const legacy = r as LegacySelectionRaw;
+  return {
+    id: legacy.id,
+    book_id: legacy.book_id,
+    spans: [
+      {
+        page: legacy.page,
+        bbox: legacy.bbox,
+        extracted_text: legacy.extracted_text ?? "",
+        surrounding_text: legacy.surrounding_text ?? "",
+      },
+    ],
+    created_at: legacy.created_at,
+  };
+}
 
 export type Conversation = {
   id: string;
@@ -129,9 +164,8 @@ export async function listSelections(bookId: string): Promise<Selection[]> {
   for (const f of files) {
     if (!f.endsWith(".json")) continue;
     try {
-      out.push(
-        await readJson<Selection>(path.join(selectionsDir(bookId), f)),
-      );
+      const raw = await readJson<unknown>(path.join(selectionsDir(bookId), f));
+      out.push(normalizeSelection(raw));
     } catch {
       // skip
     }
@@ -144,26 +178,41 @@ export async function getSelection(
   bookId: string,
   selectionId: string,
 ): Promise<Selection> {
-  return readJson<Selection>(
+  const raw = await readJson<unknown>(
     path.join(selectionsDir(bookId), `${selectionId}.json`),
   );
+  return normalizeSelection(raw);
 }
 
 export async function saveSelection(
   selection: Selection,
-  imagePngBytes: Uint8Array,
+  imagesPngBytes: Uint8Array[],
 ): Promise<void> {
   await ensureDir(selectionsDir(selection.book_id));
   const base = path.join(selectionsDir(selection.book_id), selection.id);
-  await fs.writeFile(`${base}.png`, imagePngBytes);
+  await Promise.all(
+    imagesPngBytes.map((bytes, i) =>
+      fs.writeFile(`${base}_${i}.png`, bytes),
+    ),
+  );
   await writeJsonAtomic(`${base}.json`, selection);
 }
 
 export async function readSelectionImage(
   bookId: string,
   selectionId: string,
+  spanIndex: number,
 ): Promise<Buffer> {
-  return fs.readFile(path.join(selectionsDir(bookId), `${selectionId}.png`));
+  const base = path.join(selectionsDir(bookId), selectionId);
+  try {
+    return await fs.readFile(`${base}_${spanIndex}.png`);
+  } catch (err) {
+    // Legacy single-image layout: only span 0 maps to `${id}.png`.
+    if (spanIndex === 0) {
+      return fs.readFile(`${base}.png`);
+    }
+    throw err;
+  }
 }
 
 export async function listConversationsForBook(
@@ -219,9 +268,22 @@ export async function deleteSelection(
   bookId: string,
   selectionId: string,
 ): Promise<void> {
-  const base = path.join(selectionsDir(bookId), selectionId);
+  const dir = selectionsDir(bookId);
+  const base = path.join(dir, selectionId);
   await fs.rm(`${base}.json`, { force: true });
+  // Legacy single PNG.
   await fs.rm(`${base}.png`, { force: true });
+  // Per-span PNGs: {id}_0.png, {id}_1.png, ...
+  try {
+    const files = await fs.readdir(dir);
+    await Promise.all(
+      files
+        .filter((f) => f.startsWith(`${selectionId}_`) && f.endsWith(".png"))
+        .map((f) => fs.rm(path.join(dir, f), { force: true })),
+    );
+  } catch {
+    // dir may not exist
+  }
 }
 
 export async function findConversationBookId(

@@ -30,7 +30,7 @@ type Props = {
 type DisplayMessage = {
   role: "user" | "assistant";
   text: string;
-  imagePreviewDataUrl?: string;
+  imagePreviewDataUrls?: string[];
 };
 
 export default function ConversationPanel({
@@ -90,7 +90,9 @@ export default function ConversationPanel({
       {
         role: "user",
         text: q,
-        imagePreviewDataUrl: `data:${cap.imageMediaType};base64,${cap.imageBase64}`,
+        imagePreviewDataUrls: cap.spans.map(
+          (s) => `data:${s.imageMediaType};base64,${s.imageBase64}`,
+        ),
       },
       { role: "assistant", text: "" },
     ]);
@@ -100,12 +102,14 @@ export default function ConversationPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookId,
-          page: cap.page,
-          bbox: cap.bbox,
-          imageBase64: cap.imageBase64,
-          imageMediaType: cap.imageMediaType,
-          selectionText: cap.selectionText,
-          surroundingText: cap.surroundingText,
+          spans: cap.spans.map((s) => ({
+            page: s.page,
+            bbox: s.bbox,
+            imageBase64: s.imageBase64,
+            imageMediaType: s.imageMediaType,
+            selectionText: s.selectionText,
+            surroundingText: s.surroundingText,
+          })),
           question: q,
         }),
       });
@@ -307,22 +311,39 @@ export default function ConversationPanel({
 }
 
 function PreviewBox({ capture }: { capture: CapturedSelection }) {
+  const first = capture.spans[0];
+  const last = capture.spans[capture.spans.length - 1];
+  const label =
+    capture.spans.length === 1
+      ? `page ${first.page}`
+      : `pages ${first.page}–${last.page}`;
   return (
     <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
       <p className="mb-2 text-xs uppercase tracking-wide text-zinc-500">
-        Selected region · page {capture.page}
+        Selected region · {label}
       </p>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`data:${capture.imageMediaType};base64,${capture.imageBase64}`}
-        alt="selection"
-        className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700"
-      />
-      {capture.selectionText && (
-        <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-          {capture.selectionText}
-        </p>
-      )}
+      <div className="space-y-2">
+        {capture.spans.map((s, i) => (
+          <div key={i}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`data:${s.imageMediaType};base64,${s.imageBase64}`}
+              alt={`selection page ${s.page}`}
+              className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700"
+            />
+            {capture.spans.length > 1 && (
+              <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">
+                page {s.page}
+              </p>
+            )}
+            {s.selectionText && (
+              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                {s.selectionText}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -335,6 +356,7 @@ function MessageBubble({
   streaming: boolean;
 }) {
   const isUser = m.role === "user";
+  const images = m.imagePreviewDataUrls ?? [];
   return (
     <div
       className={`rounded p-3 text-sm ${
@@ -343,15 +365,18 @@ function MessageBubble({
           : "mr-6 bg-blue-50 dark:bg-blue-950/50"
       }`}
     >
-      {m.imagePreviewDataUrl && (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={m.imagePreviewDataUrl}
-            alt="region"
-            className="mb-2 max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
-          />
-        </>
+      {images.length > 0 && (
+        <div className="mb-2 space-y-1">
+          {images.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={i}
+              src={src}
+              alt={`region ${i + 1}`}
+              className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
+            />
+          ))}
+        </div>
       )}
       {isUser ? (
         <p className="whitespace-pre-wrap">{m.text}</p>
@@ -370,12 +395,14 @@ function MessageBubble({
 function turnsToDisplay(turns: Turn[]): DisplayMessage[] {
   return turns.map((t) => {
     let text = "";
-    let imagePreviewDataUrl: string | undefined;
+    const imagePreviewDataUrls: string[] = [];
     for (const block of t.content) {
       if (block.type === "text") {
         text += (text ? "\n" : "") + block.text;
       } else if (block.type === "image") {
-        imagePreviewDataUrl = `data:${block.source.media_type};base64,${block.source.data}`;
+        imagePreviewDataUrls.push(
+          `data:${block.source.media_type};base64,${block.source.data}`,
+        );
       }
     }
     if (t.role === "user") {
@@ -384,7 +411,12 @@ function turnsToDisplay(turns: Turn[]): DisplayMessage[] {
       const m = text.match(/Question:\s*([\s\S]*)$/);
       if (m) text = m[1].trim();
     }
-    return { role: t.role, text, imagePreviewDataUrl };
+    return {
+      role: t.role,
+      text,
+      imagePreviewDataUrls:
+        imagePreviewDataUrls.length > 0 ? imagePreviewDataUrls : undefined,
+    };
   });
 }
 

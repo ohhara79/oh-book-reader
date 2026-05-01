@@ -9,12 +9,16 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, pdfjs } from "react-pdf";
+import type { DocumentProps } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+
+type DocumentCallback = Parameters<NonNullable<DocumentProps["onLoadSuccess"]>>[0];
 import SelectionOverlay, {
   type CapturedSelection,
 } from "./SelectionOverlay";
+import PageSlot from "./PageSlot";
 import ConversationPanel from "./ConversationPanel";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -26,11 +30,8 @@ type Book = {
   page_count: number;
 };
 
-type Sel = {
-  id: string;
-  page: number;
-  bbox: [number, number, number, number];
-};
+type SelSpan = { page: number; bbox: [number, number, number, number] };
+type Sel = { id: string; spans: SelSpan[] };
 
 type ConvSummary = { id: string; title: string; updated_at: number };
 
@@ -39,6 +40,8 @@ type ConversationsBySelection = Record<string, ConvSummary[]>;
 type ActiveConversation =
   | { kind: "new"; capture: CapturedSelection }
   | { kind: "existing"; conversationId: string };
+
+type IntrinsicDims = { width: number; height: number };
 
 const SIDEBAR_DEFAULT = 448;
 const SIDEBAR_MIN = 320;
@@ -51,6 +54,9 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_SCALE = 1.4;
 const SCALE_MIN = 0.5;
 const SCALE_MAX = 3;
+const PAGE_GAP_PX = 16;
+const RENDER_BUFFER = 2;
+const DIMS_FETCH_CONCURRENCY = 16;
 
 function clampSidebarWidth(w: number) {
   const max = Math.min(
@@ -79,6 +85,11 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [pageNum, setPageNum] = useState(DEFAULT_PAGE);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [intrinsicDims, setIntrinsicDims] = useState<
+    Record<number, IntrinsicDims>
+  >({});
+  const [defaultIntrinsic, setDefaultIntrinsic] =
+    useState<IntrinsicDims | null>(null);
   const [selections, setSelections] = useState<Sel[]>([]);
   const [convsBySelection, setConvsBySelection] =
     useState<ConversationsBySelection>({});
@@ -86,7 +97,21 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const pageWrapperRef = useRef<HTMLDivElement>(null);
+  const [restoreSignal, setRestoreSignal] = useState(0);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const pageNumRef = useRef(pageNum);
+  const scaleRef = useRef(scale);
+  const ioRafRef = useRef<number | null>(null);
+  const restoreScrollDoneRef = useRef(false);
+
+  useEffect(() => {
+    pageNumRef.current = pageNum;
+  }, [pageNum]);
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,29 +191,297 @@ export default function Reader({ bookId }: { bookId: string }) {
     [bookId],
   );
 
-  const goPrev = () => setPageNum((n) => Math.max(1, n - 1));
-  const goNext = () =>
-    setPageNum((n) => (numPages ? Math.min(numPages, n + 1) : n + 1));
+  const handleDocumentLoad = useCallback(
+    async (pdf: DocumentCallback) => {
+      setNumPages(pdf.numPages);
+      restoreScrollDoneRef.current = false;
+      // Fetch page 1 first to seed default dims; then everything else in
+      // parallel batches.
+      try {
+        const first = await pdf.getPage(1);
+        const fv = first.getViewport({ scale: 1 });
+        const fdims = { width: fv.width, height: fv.height };
+        setDefaultIntrinsic(fdims);
+        setIntrinsicDims((prev) => ({ ...prev, 1: fdims }));
+      } catch {
+        return;
+      }
+      const total = pdf.numPages;
+      const collected: Record<number, IntrinsicDims> = {};
+      let next = 2;
+      const workers = Array.from(
+        { length: Math.min(DIMS_FETCH_CONCURRENCY, Math.max(0, total - 1)) },
+        async () => {
+          for (;;) {
+            const n = next++;
+            if (n > total) return;
+            try {
+              const p = await pdf.getPage(n);
+              const v = p.getViewport({ scale: 1 });
+              collected[n] = { width: v.width, height: v.height };
+            } catch {
+              // skip on error
+            }
+          }
+        },
+      );
+      // Periodically flush collected dims into state so layout settles
+      // progressively rather than waiting for all pages.
+      const flush = () => {
+        if (Object.keys(collected).length === 0) return;
+        const snap = collected;
+        setIntrinsicDims((prev) => ({ ...prev, ...snap }));
+        for (const k of Object.keys(snap)) delete snap[Number(k)];
+      };
+      const interval = setInterval(flush, 100);
+      try {
+        await Promise.all(workers);
+      } finally {
+        clearInterval(interval);
+        flush();
+        setRestoreSignal((s) => s + 1);
+      }
+    },
+    [],
+  );
+
+  const pageDims = useMemo(() => {
+    const out: Record<number, { width: number; height: number }> = {};
+    if (!numPages) return out;
+    const fallback = defaultIntrinsic;
+    for (let n = 1; n <= numPages; n++) {
+      const id = intrinsicDims[n] ?? fallback;
+      if (id) out[n] = { width: id.width * scale, height: id.height * scale };
+    }
+    return out;
+  }, [intrinsicDims, defaultIntrinsic, numPages, scale]);
+
+  const pageOffsets = useMemo(() => {
+    // top offset of each page within contentRef (analytic, gap-aware).
+    const out: Record<number, { top: number; left: number }> = {};
+    if (!numPages) return out;
+    const maxWidth = Math.max(
+      0,
+      ...Object.values(pageDims).map((d) => d.width),
+    );
+    let y = 0;
+    for (let n = 1; n <= numPages; n++) {
+      const d = pageDims[n];
+      if (!d) break;
+      const left = (maxWidth - d.width) / 2;
+      out[n] = { top: y, left };
+      y += d.height + PAGE_GAP_PX;
+    }
+    return out;
+  }, [pageDims, numPages]);
+
+  const contentSize = useMemo(() => {
+    if (!numPages) return { width: 0, height: 0 };
+    let width = 0;
+    let height = 0;
+    for (let n = 1; n <= numPages; n++) {
+      const d = pageDims[n];
+      if (!d) continue;
+      if (d.width > width) width = d.width;
+      height += d.height + (n < numPages ? PAGE_GAP_PX : 0);
+    }
+    return { width, height };
+  }, [pageDims, numPages]);
+
+  const renderWindow = useMemo(() => {
+    const start = Math.max(1, pageNum - RENDER_BUFFER);
+    const end = numPages
+      ? Math.min(numPages, pageNum + RENDER_BUFFER)
+      : pageNum + RENDER_BUFFER;
+    return { start, end };
+  }, [pageNum, numPages]);
+
+  const registerPageRef = useCallback(
+    (n: number, el: HTMLDivElement | null) => {
+      const map = pageWrapperRefs.current;
+      if (el) {
+        map.set(n, el);
+      } else {
+        map.delete(n);
+      }
+    },
+    [],
+  );
+
+  const goPrev = useCallback(() => {
+    setPageNum((n) => {
+      const target = Math.max(1, n - 1);
+      scrollToPage(target);
+      return target;
+    });
+  }, []);
+  const goNext = useCallback(() => {
+    setPageNum((n) => {
+      const target = numPages ? Math.min(numPages, n + 1) : n + 1;
+      scrollToPage(target);
+      return target;
+    });
+  }, [numPages]);
+
+  const scrollToPage = useCallback((n: number, smooth = true) => {
+    const wrapper = pageWrapperRefs.current.get(n);
+    const main = mainRef.current;
+    if (!wrapper || !main) return;
+    const wrapperTop =
+      wrapper.getBoundingClientRect().top -
+      main.getBoundingClientRect().top +
+      main.scrollTop;
+    main.scrollTo({
+      top: Math.max(0, wrapperTop - 8),
+      behavior: smooth ? "smooth" : "auto",
+    });
+  }, []);
+
+  // Restore scroll position on first render after dims become available.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (restoreScrollDoneRef.current) return;
+    if (!numPages) return;
+    if (!pageDims[pageNum]) return;
+    // Defer to next frame so PageSlots have mounted.
+    requestAnimationFrame(() => {
+      scrollToPage(pageNum, false);
+      restoreScrollDoneRef.current = true;
+    });
+  }, [hydrated, numPages, pageDims, pageNum, scrollToPage, restoreSignal]);
+
+  // Preserve scroll position across zoom: capture focused-page intra-page
+  // ratio before scale changes, restore after layout settles.
+  const handleScaleChange = useCallback(
+    (next: number) => {
+      const main = mainRef.current;
+      const focused = pageNumRef.current;
+      const wrapper = pageWrapperRefs.current.get(focused);
+      let intraRatio = 0;
+      if (main && wrapper) {
+        const wrapperTop =
+          wrapper.getBoundingClientRect().top -
+          main.getBoundingClientRect().top +
+          main.scrollTop;
+        const offsetWithin = main.scrollTop - wrapperTop;
+        intraRatio = wrapper.offsetHeight
+          ? offsetWithin / wrapper.offsetHeight
+          : 0;
+      }
+      setScale(next);
+      // After dims update, restore scroll to keep the focused page roughly
+      // in the same intra-page position.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const m = mainRef.current;
+          const w = pageWrapperRefs.current.get(focused);
+          if (!m || !w) return;
+          const newWrapperTop =
+            w.getBoundingClientRect().top -
+            m.getBoundingClientRect().top +
+            m.scrollTop;
+          m.scrollTo({
+            top: Math.max(0, newWrapperTop + intraRatio * w.offsetHeight - 8),
+            behavior: "auto",
+          });
+        });
+      });
+    },
+    [],
+  );
 
   const onCapture = useCallback((cap: CapturedSelection) => {
     setActive({ kind: "new", capture: cap });
   }, []);
 
-  const onConversationCreated = useCallback(
-    async () => {
-      await refreshSelections();
-    },
-    [refreshSelections],
-  );
+  const onConversationCreated = useCallback(async () => {
+    await refreshSelections();
+  }, [refreshSelections]);
 
-  const pageSelections = useMemo(
-    () => selections.filter((s) => s.page === pageNum),
-    [selections, pageNum],
+  const onPinClick = useCallback(
+    (selectionId: string) => {
+      const convs = convsBySelection[selectionId] ?? [];
+      if (convs.length > 0) {
+        setActive({ kind: "existing", conversationId: convs[0].id });
+      }
+    },
+    [convsBySelection],
   );
 
   const onSplitterDrag = useCallback((clientX: number) => {
     setSidebarWidth(clampSidebarWidth(window.innerWidth - clientX));
   }, []);
+
+  // IntersectionObserver: track which page is most prominent and update
+  // pageNum. Driven by the main scroll container.
+  useEffect(() => {
+    if (!numPages) return;
+    const root = mainRef.current;
+    if (!root) return;
+    const ratios = new Map<number, number>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const n = Number(
+            (e.target as HTMLElement).getAttribute("data-page-number") ?? "0",
+          );
+          if (!n) continue;
+          ratios.set(n, e.intersectionRatio);
+        }
+        if (ioRafRef.current != null) cancelAnimationFrame(ioRafRef.current);
+        ioRafRef.current = requestAnimationFrame(() => {
+          ioRafRef.current = null;
+          let bestN = 0;
+          let bestR = -1;
+          for (const [n, r] of ratios) {
+            if (r > bestR) {
+              bestR = r;
+              bestN = n;
+            }
+          }
+          if (bestN > 0 && bestN !== pageNumRef.current) {
+            setPageNum(bestN);
+          }
+        });
+      },
+      {
+        root,
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      },
+    );
+    // Observe all currently registered wrappers; also re-observe whenever
+    // wrappers register/unregister via a MutationObserver on the content tree.
+    const observed = new Set<HTMLDivElement>();
+    const refresh = () => {
+      for (const [, el] of pageWrapperRefs.current) {
+        if (!observed.has(el)) {
+          io.observe(el);
+          observed.add(el);
+        }
+      }
+      for (const el of observed) {
+        if (![...pageWrapperRefs.current.values()].includes(el)) {
+          io.unobserve(el);
+          observed.delete(el);
+        }
+      }
+    };
+    refresh();
+    const content = contentRef.current;
+    let mo: MutationObserver | null = null;
+    if (content) {
+      mo = new MutationObserver(() => refresh());
+      mo.observe(content, { childList: true, subtree: true });
+    }
+    return () => {
+      io.disconnect();
+      mo?.disconnect();
+      if (ioRafRef.current != null) {
+        cancelAnimationFrame(ioRafRef.current);
+        ioRafRef.current = null;
+      }
+    };
+  }, [numPages]);
 
   const overlayOnDesktop = !!active && sidebarHidden;
   const layoutClass = active
@@ -203,6 +496,11 @@ export default function Reader({ bookId }: { bookId: string }) {
   const asideStyle = {
     ["--sidebar-w" as string]: `${sidebarWidth}px`,
   } as CSSProperties;
+
+  const pages: number[] = useMemo(() => {
+    if (!numPages) return [];
+    return Array.from({ length: numPages }, (_, i) => i + 1);
+  }, [numPages]);
 
   return (
     <div className="flex h-screen flex-col">
@@ -235,7 +533,13 @@ export default function Reader({ bookId }: { bookId: string }) {
               value={pageNum}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
-                if (!Number.isNaN(v)) setPageNum(v);
+                if (!Number.isNaN(v)) {
+                  const clamped = numPages
+                    ? Math.min(numPages, Math.max(1, v))
+                    : Math.max(1, v);
+                  setPageNum(clamped);
+                  scrollToPage(clamped);
+                }
               }}
               className="w-16 rounded border px-1 py-0.5 text-center"
             />
@@ -254,7 +558,9 @@ export default function Reader({ bookId }: { bookId: string }) {
           <span className="ml-3 flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}
+              onClick={() =>
+                handleScaleChange(Math.max(SCALE_MIN, scale - 0.2))
+              }
               className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
               aria-label="Zoom out"
             >
@@ -265,7 +571,9 @@ export default function Reader({ bookId }: { bookId: string }) {
             </span>
             <button
               type="button"
-              onClick={() => setScale((s) => Math.min(3, s + 0.2))}
+              onClick={() =>
+                handleScaleChange(Math.min(SCALE_MAX, scale + 0.2))
+              }
               className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
               aria-label="Zoom in"
             >
@@ -285,39 +593,65 @@ export default function Reader({ bookId }: { bookId: string }) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-auto bg-zinc-100 p-6 text-center dark:bg-zinc-900">
-          <div ref={pageWrapperRef} className="mx-auto inline-block relative">
-            <Document
-              file={fileProp}
-              onLoadSuccess={(p) => setNumPages(p.numPages)}
-              loading={<div className="p-8 text-zinc-500">Loading PDF…</div>}
-              error={<div className="p-8 text-red-500">Failed to load PDF.</div>}
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-auto bg-zinc-100 p-6 dark:bg-zinc-900"
+        >
+          <Document
+            file={fileProp}
+            onLoadSuccess={handleDocumentLoad}
+            loading={<div className="p-8 text-zinc-500">Loading PDF…</div>}
+            error={<div className="p-8 text-red-500">Failed to load PDF.</div>}
+          >
+            <div
+              ref={contentRef}
+              className="relative mx-auto"
+              style={{
+                width: contentSize.width || undefined,
+                minHeight: contentSize.height || undefined,
+              }}
             >
-              <div className="relative">
-                <Page
-                  pageNumber={pageNum}
-                  scale={scale}
-                  renderTextLayer
-                  renderAnnotationLayer={false}
-                />
-                <SelectionOverlay
-                  pageNumber={pageNum}
-                  scale={scale}
-                  onCapture={onCapture}
-                  existingSelections={pageSelections}
-                  onPinClick={(selId) => {
-                    const convs = convsBySelection[selId] ?? [];
-                    if (convs.length > 0) {
-                      setActive({
-                        kind: "existing",
-                        conversationId: convs[0].id,
-                      });
-                    }
-                  }}
-                />
+              <div className="flex flex-col items-center" style={{ gap: PAGE_GAP_PX }}>
+                {pages.map((n) => {
+                  const dims = pageDims[n];
+                  if (!dims) {
+                    return (
+                      <div
+                        key={n}
+                        data-page-number={n}
+                        ref={(el) => registerPageRef(n, el)}
+                        style={{ width: 600, height: 800 }}
+                        className="bg-white"
+                      />
+                    );
+                  }
+                  const mounted =
+                    n >= renderWindow.start && n <= renderWindow.end;
+                  return (
+                    <PageSlot
+                      key={n}
+                      pageNumber={n}
+                      width={dims.width}
+                      height={dims.height}
+                      mounted={mounted}
+                      registerRef={registerPageRef}
+                    />
+                  );
+                })}
               </div>
-            </Document>
-          </div>
+              {numPages != null && (
+                <SelectionOverlay
+                  scale={scale}
+                  pageOffsets={pageOffsets}
+                  pageDims={pageDims}
+                  pageWrapperRefs={pageWrapperRefs}
+                  selections={selections}
+                  onCapture={onCapture}
+                  onPinClick={onPinClick}
+                />
+              )}
+            </div>
+          </Document>
         </main>
         {!sidebarHidden && <Splitter onDrag={onSplitterDrag} />}
         <aside className={asideClass} style={asideStyle}>

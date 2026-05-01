@@ -6,10 +6,13 @@ import {
 import type { ContentBlock } from "./store";
 
 const SYSTEM_PROMPT = `You answer questions about a book the user is reading.
-You will be given a region the user selected from a page (as text and as an image),
-plus the surrounding page text. Quote precisely from the selected text when relevant.
-When the question involves math, render math in LaTeX using $...$ for inline math
-and $$...$$ for display math. Be concise.`;
+You will be given a region the user selected from one or more consecutive pages
+of the book. For each page the selection touches, you will be shown the selected
+text and an image of the selected region in reading order, plus surrounding page
+text. When the selection spans pages, treat the spans as a single contiguous
+excerpt. Quote precisely from the selected text when relevant. When the question
+involves math, render math in LaTeX using $...$ for inline math and $$...$$ for
+display math. Be concise.`;
 
 const BASE_OPTIONS: Options = {
   model: "claude-sonnet-4-6",

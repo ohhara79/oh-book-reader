@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
-export type CapturedSelection = {
+export type CapturedSpan = {
   page: number;
-  /** PDF user-space coordinates (scale-independent). */
+  /** PDF user-space coordinates, page-relative, scale-independent. */
   bbox: [number, number, number, number];
   imageBase64: string;
   imageMediaType: "image/png";
@@ -12,17 +12,18 @@ export type CapturedSelection = {
   surroundingText: string;
 };
 
-type Sel = {
-  id: string;
-  page: number;
-  bbox: [number, number, number, number];
-};
+export type CapturedSelection = { spans: CapturedSpan[] };
+
+type SelSpan = { page: number; bbox: [number, number, number, number] };
+type Sel = { id: string; spans: SelSpan[] };
 
 type Props = {
-  pageNumber: number;
   scale: number;
+  pageOffsets: Record<number, { top: number; left: number }>;
+  pageDims: Record<number, { width: number; height: number }>;
+  pageWrapperRefs: RefObject<Map<number, HTMLDivElement>>;
+  selections: Sel[];
   onCapture: (cap: CapturedSelection) => void;
-  existingSelections: Sel[];
   onPinClick: (selectionId: string) => void;
 };
 
@@ -40,10 +41,12 @@ const LONG_PRESS_MS = 400;
 const TOUCH_CANCEL_MOVE_PX = 10;
 
 export default function SelectionOverlay({
-  pageNumber,
   scale,
+  pageOffsets,
+  pageDims,
+  pageWrapperRefs,
+  selections,
   onCapture,
-  existingSelections,
   onPinClick,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -219,84 +222,121 @@ export default function SelectionOverlay({
     setDrag(null);
     if (sel.w < MIN_DRAG_PX || sel.h < MIN_DRAG_PX) return;
 
-    const wrapper = overlayRef.current?.parentElement;
-    if (!wrapper) return;
-    const canvas = wrapper.querySelector("canvas") as HTMLCanvasElement | null;
-    if (!canvas) return;
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    const overlayRect = overlay.getBoundingClientRect();
+    const dragClient = {
+      left: overlayRect.left + sel.x,
+      top: overlayRect.top + sel.y,
+      right: overlayRect.left + sel.x + sel.w,
+      bottom: overlayRect.top + sel.y + sel.h,
+    };
 
-    // Map overlay coordinates → canvas pixel coordinates.
-    // (Canvas may be rendered at a different DPR than its CSS size.)
-    const cssRect = canvas.getBoundingClientRect();
-    const overlayRect = overlayRef.current!.getBoundingClientRect();
-    const offsetX = cssRect.left - overlayRect.left;
-    const offsetY = cssRect.top - overlayRect.top;
-    const xPct = (sel.x - offsetX) / cssRect.width;
-    const yPct = (sel.y - offsetY) / cssRect.height;
-    const wPct = sel.w / cssRect.width;
-    const hPct = sel.h / cssRect.height;
+    const refs = pageWrapperRefs.current;
+    if (!refs) return;
+    const spans: CapturedSpan[] = [];
+    const sortedPages = [...refs.keys()].sort((a, b) => a - b);
+    for (const pageNum of sortedPages) {
+      const wrapper = refs.get(pageNum);
+      if (!wrapper) continue;
+      const pageRect = wrapper.getBoundingClientRect();
+      const ix = Math.max(dragClient.left, pageRect.left);
+      const iy = Math.max(dragClient.top, pageRect.top);
+      const ir = Math.min(dragClient.right, pageRect.right);
+      const ib = Math.min(dragClient.bottom, pageRect.bottom);
+      if (ir <= ix || ib <= iy) continue;
+      const canvas = wrapper.querySelector("canvas") as HTMLCanvasElement | null;
+      if (!canvas) {
+        // Page not yet rendered (placeholder). Skip; user sees a missing
+        // span. Could be worked around by raising RENDER_BUFFER.
+        if (
+          typeof console !== "undefined" &&
+          typeof console.warn === "function"
+        ) {
+          console.warn(
+            `selection crossed unmounted page ${pageNum}; skipping its span`,
+          );
+        }
+        continue;
+      }
+      const cssRect = canvas.getBoundingClientRect();
+      const xPct = (ix - cssRect.left) / cssRect.width;
+      const yPct = (iy - cssRect.top) / cssRect.height;
+      const wPct = (ir - ix) / cssRect.width;
+      const hPct = (ib - iy) / cssRect.height;
 
-    const sx = Math.max(0, Math.floor(xPct * canvas.width));
-    const sy = Math.max(0, Math.floor(yPct * canvas.height));
-    const sw = Math.max(1, Math.min(canvas.width - sx, Math.ceil(wPct * canvas.width)));
-    const sh = Math.max(1, Math.min(canvas.height - sy, Math.ceil(hPct * canvas.height)));
-
-    const tmp = document.createElement("canvas");
-    tmp.width = sw;
-    tmp.height = sh;
-    const ctx = tmp.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-    const dataUrl = tmp.toDataURL("image/png");
-    const imageBase64 = dataUrl.split(",", 2)[1] ?? "";
-
-    // Extract text from the text layer.
-    const textLayer = wrapper.querySelector(
-      ".react-pdf__Page__textContent",
-    ) as HTMLElement | null;
-    const inside: string[] = [];
-    const allText: string[] = [];
-    if (textLayer) {
-      const layerRect = textLayer.getBoundingClientRect();
-      const localLeft = sel.x + overlayRect.left - layerRect.left;
-      const localTop = sel.y + overlayRect.top - layerRect.top;
-      const localRight = localLeft + sel.w;
-      const localBottom = localTop + sel.h;
-      const items = textLayer.querySelectorAll<HTMLElement>(
-        "span, div.react-pdf__Page__textContent__container > *",
+      const sx = Math.max(0, Math.floor(xPct * canvas.width));
+      const sy = Math.max(0, Math.floor(yPct * canvas.height));
+      const sw = Math.max(
+        1,
+        Math.min(canvas.width - sx, Math.ceil(wPct * canvas.width)),
       );
-      items.forEach((el) => {
-        const text = (el.textContent ?? "").trim();
-        if (!text) return;
-        const r = el.getBoundingClientRect();
-        const left = r.left - layerRect.left;
-        const top = r.top - layerRect.top;
-        const right = left + r.width;
-        const bottom = top + r.height;
-        allText.push(text);
-        const intersects =
-          right >= localLeft &&
-          left <= localRight &&
-          bottom >= localTop &&
-          top <= localBottom;
-        if (intersects) inside.push(text);
+      const sh = Math.max(
+        1,
+        Math.min(canvas.height - sy, Math.ceil(hPct * canvas.height)),
+      );
+
+      const tmp = document.createElement("canvas");
+      tmp.width = sw;
+      tmp.height = sh;
+      const ctx = tmp.getContext("2d");
+      if (!ctx) continue;
+      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      const dataUrl = tmp.toDataURL("image/png");
+      const imageBase64 = dataUrl.split(",", 2)[1] ?? "";
+
+      // Extract text from the page's text layer.
+      const textLayer = wrapper.querySelector(
+        ".react-pdf__Page__textContent",
+      ) as HTMLElement | null;
+      const inside: string[] = [];
+      const allText: string[] = [];
+      if (textLayer) {
+        const layerRect = textLayer.getBoundingClientRect();
+        const localLeft = ix - layerRect.left;
+        const localTop = iy - layerRect.top;
+        const localRight = ir - layerRect.left;
+        const localBottom = ib - layerRect.top;
+        const items = textLayer.querySelectorAll<HTMLElement>(
+          "span, div.react-pdf__Page__textContent__container > *",
+        );
+        items.forEach((el) => {
+          const text = (el.textContent ?? "").trim();
+          if (!text) return;
+          const r = el.getBoundingClientRect();
+          const left = r.left - layerRect.left;
+          const top = r.top - layerRect.top;
+          const right = left + r.width;
+          const bottom = top + r.height;
+          allText.push(text);
+          const intersects =
+            right >= localLeft &&
+            left <= localRight &&
+            bottom >= localTop &&
+            top <= localBottom;
+          if (intersects) inside.push(text);
+        });
+      }
+
+      const pdfBbox: [number, number, number, number] = [
+        (ix - pageRect.left) / scale,
+        (iy - pageRect.top) / scale,
+        (ir - ix) / scale,
+        (ib - iy) / scale,
+      ];
+
+      spans.push({
+        page: pageNum,
+        bbox: pdfBbox,
+        imageBase64,
+        imageMediaType: "image/png",
+        selectionText: inside.join(" ").replace(/\s+/g, " ").trim(),
+        surroundingText: allText.join(" ").replace(/\s+/g, " ").trim(),
       });
     }
 
-    const pdfBbox: [number, number, number, number] = [
-      sel.x / scale,
-      sel.y / scale,
-      sel.w / scale,
-      sel.h / scale,
-    ];
-
-    onCapture({
-      page: pageNumber,
-      bbox: pdfBbox,
-      imageBase64,
-      imageMediaType: "image/png",
-      selectionText: inside.join(" ").replace(/\s+/g, " ").trim(),
-      surroundingText: allText.join(" ").replace(/\s+/g, " ").trim(),
-    });
+    if (spans.length === 0) return;
+    onCapture({ spans });
   }
 
   function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
@@ -309,6 +349,22 @@ export default function SelectionOverlay({
     resetGesture();
     setDrag(null);
   }
+
+  // Compute pin positions in overlay coordinates from page offsets + bbox.
+  const pins = selections.flatMap((sel) =>
+    sel.spans
+      .filter((span) => pageOffsets[span.page] && pageDims[span.page])
+      .map((span) => {
+        const off = pageOffsets[span.page];
+        return {
+          selectionId: sel.id,
+          left: off.left + span.bbox[0] * scale,
+          top: off.top + span.bbox[1] * scale,
+          width: span.bbox[2] * scale,
+          height: span.bbox[3] * scale,
+        };
+      }),
+  );
 
   return (
     <div
@@ -331,17 +387,17 @@ export default function SelectionOverlay({
           }}
         />
       )}
-      {existingSelections.map((s) => (
+      {pins.map((p, i) => (
         <button
-          key={s.id}
+          key={`${p.selectionId}-${i}`}
           type="button"
-          aria-label={`Open conversation for selection ${s.id}`}
+          aria-label={`Open conversation for selection ${p.selectionId}`}
           className="absolute cursor-pointer border-2 border-amber-500 bg-amber-500/10 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40"
           style={{
-            left: s.bbox[0] * scale,
-            top: s.bbox[1] * scale,
-            width: s.bbox[2] * scale,
-            height: s.bbox[3] * scale,
+            left: p.left,
+            top: p.top,
+            width: p.width,
+            height: p.height,
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -350,7 +406,7 @@ export default function SelectionOverlay({
               dragMovedRef.current = false;
               return;
             }
-            onPinClick(s.id);
+            onPinClick(p.selectionId);
           }}
         />
       ))}

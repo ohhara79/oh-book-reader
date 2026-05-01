@@ -3,6 +3,7 @@ import {
   type ContentBlock,
   type Conversation,
   type Selection,
+  type SelectionSpan,
   newConversationId,
   newSelectionId,
   saveSelection,
@@ -14,55 +15,49 @@ import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 
 export const runtime = "nodejs";
 
-type Body = {
-  bookId: string;
+type SpanInput = {
   page: number;
   bbox: [number, number, number, number];
-  imageBase64: string; // raw base64 (no data: prefix)
+  imageBase64: string;
   imageMediaType?: "image/png" | "image/jpeg";
-  selectionText: string;
-  surroundingText: string;
+  selectionText?: string;
+  surroundingText?: string;
+};
+
+type Body = {
+  bookId: string;
+  spans: SpanInput[];
   question: string;
 };
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as Body;
-  if (!body?.bookId || !body?.question) {
+  if (
+    !body?.bookId ||
+    !body?.question ||
+    !Array.isArray(body.spans) ||
+    body.spans.length === 0
+  ) {
     return new Response("bad request", { status: 400 });
   }
 
   const now = Date.now();
+  const spans: SelectionSpan[] = body.spans.map((s) => ({
+    page: s.page,
+    bbox: s.bbox,
+    extracted_text: s.selectionText ?? "",
+    surrounding_text: s.surroundingText ?? "",
+  }));
   const selection: Selection = {
     id: newSelectionId(),
     book_id: body.bookId,
-    page: body.page,
-    bbox: body.bbox,
-    extracted_text: body.selectionText ?? "",
-    surrounding_text: body.surroundingText ?? "",
+    spans,
     created_at: now,
   };
-  const imageBytes = Buffer.from(body.imageBase64, "base64");
-  await saveSelection(selection, imageBytes);
+  const imageBuffers = body.spans.map((s) => Buffer.from(s.imageBase64, "base64"));
+  await saveSelection(selection, imageBuffers);
 
-  const firstUserContent: ContentBlock[] = [
-    {
-      type: "text",
-      text: `Selected text from the page:\n${selection.extracted_text || "(no text layer; rely on the image)"}`,
-    },
-    {
-      type: "text",
-      text: `Surrounding page text:\n${selection.surrounding_text || "(none)"}`,
-    },
-    {
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: body.imageMediaType ?? "image/png",
-        data: body.imageBase64,
-      },
-    },
-    { type: "text", text: `Question: ${body.question}` },
-  ];
+  const firstUserContent = buildFirstUserContent(body);
 
   const conversation: Conversation = {
     id: newConversationId(),
@@ -134,4 +129,69 @@ export async function POST(req: NextRequest) {
   });
 
   return new Response(stream, { headers: SSE_HEADERS });
+}
+
+function buildFirstUserContent(body: Body): ContentBlock[] {
+  const out: ContentBlock[] = [];
+  if (body.spans.length === 1) {
+    const s = body.spans[0];
+    out.push(
+      {
+        type: "text",
+        text: `Selected text from page ${s.page}:\n${
+          s.selectionText || "(no text layer; rely on the image)"
+        }`,
+      },
+      {
+        type: "text",
+        text: `Surrounding page text:\n${s.surroundingText || "(none)"}`,
+      },
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: s.imageMediaType ?? "image/png",
+          data: s.imageBase64,
+        },
+      },
+      { type: "text", text: `Question: ${body.question}` },
+    );
+    return out;
+  }
+
+  const firstPage = body.spans[0].page;
+  const lastPage = body.spans[body.spans.length - 1].page;
+  out.push({
+    type: "text",
+    text: `The user selected a region that spans pages ${firstPage}–${lastPage}. The selected content for each page is shown below in reading order.`,
+  });
+  for (const s of body.spans) {
+    out.push({
+      type: "text",
+      text: `Page ${s.page} — selected text:\n${
+        s.selectionText || "(no text layer; rely on the image)"
+      }`,
+    });
+    out.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: s.imageMediaType ?? "image/png",
+        data: s.imageBase64,
+      },
+    });
+  }
+  out.push({
+    type: "text",
+    text: body.spans
+      .map(
+        (s) =>
+          `Surrounding text from page ${s.page}:\n${
+            s.surroundingText || "(none)"
+          }`,
+      )
+      .join("\n\n"),
+  });
+  out.push({ type: "text", text: `Question: ${body.question}` });
+  return out;
 }

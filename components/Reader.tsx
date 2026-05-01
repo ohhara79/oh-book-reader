@@ -45,7 +45,6 @@ const SIDEBAR_MIN = 320;
 const SIDEBAR_MAX_HARD = 1200;
 const SIDEBAR_WIDTH_KEY = "ohbr.sidebarWidth";
 const SIDEBAR_HIDDEN_KEY = "ohbr.sidebarHidden";
-const LAST_BOOK_KEY = "ohbr.lastBookId";
 const bookStateKey = (id: string) => `ohbr.book.${id}`;
 
 const DEFAULT_PAGE = 1;
@@ -122,7 +121,6 @@ export default function Reader({ bookId }: { bookId: string }) {
         );
       }
     }
-    localStorage.setItem(LAST_BOOK_KEY, bookId);
     setHydrated(true);
   }, [bookId]);
 

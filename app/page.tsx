@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type Book = {
@@ -12,45 +11,23 @@ type Book = {
   uploaded_at: number;
 };
 
-const LAST_BOOK_KEY = "ohbr.lastBookId";
 const bookStateKey = (id: string) => `ohbr.book.${id}`;
 
 export default function Library() {
-  const router = useRouter();
   const [books, setBooks] = useState<Book[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
-  const [resuming, setResuming] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     const r = await fetch("/api/books");
     const j = (await r.json()) as { books: Book[] };
     setBooks(j.books);
-    return j.books;
   }
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const lastId = localStorage.getItem(LAST_BOOK_KEY);
-      if (lastId) setResuming(true);
-      const list = await refresh();
-      if (cancelled) return;
-      if (lastId) {
-        if (list.some((b) => b.id === lastId)) {
-          router.replace(`/books/${lastId}`);
-          return;
-        }
-        localStorage.removeItem(LAST_BOOK_KEY);
-        localStorage.removeItem(bookStateKey(lastId));
-      }
-      setResuming(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
+    void refresh();
+  }, []);
 
   async function onDelete(book: Book) {
     if (
@@ -68,9 +45,6 @@ export default function Library() {
         return;
       }
       localStorage.removeItem(bookStateKey(book.id));
-      if (localStorage.getItem(LAST_BOOK_KEY) === book.id) {
-        localStorage.removeItem(LAST_BOOK_KEY);
-      }
       await refresh();
     } finally {
       setDeleting((prev) => {
@@ -117,7 +91,7 @@ export default function Library() {
         </label>
       </header>
 
-      {books === null || resuming ? (
+      {books === null ? (
         <p className="text-zinc-500">Loading…</p>
       ) : books.length === 0 ? (
         <p className="text-zinc-500">No books yet. Upload a PDF to start.</p>

@@ -32,7 +32,6 @@ type DisplayMessage =
   | {
       role: "user" | "assistant";
       text: string;
-      imagePreviewDataUrls?: string[];
       created_at?: number;
     }
   | {
@@ -112,9 +111,6 @@ export default function ConversationPanel({
       {
         role: "user",
         text: q,
-        imagePreviewDataUrls: cap.spans.map(
-          (s) => `data:${s.imageMediaType};base64,${s.imageBase64}`,
-        ),
         created_at: askedAt,
       },
       { role: "assistant", text: "" },
@@ -507,7 +503,6 @@ function MessageBubble({
     );
   }
   const isUser = m.role === "user";
-  const images = m.imagePreviewDataUrls ?? [];
   return (
     <div
       className={`rounded p-3 text-sm ${
@@ -520,19 +515,6 @@ function MessageBubble({
         <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
           {isUser ? "ask" : "claude"} · {formatTimestamp(m.created_at)}
         </p>
-      )}
-      {images.length > 0 && (
-        <div className="mb-2 space-y-1">
-          {images.map((src, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={i}
-              src={src}
-              alt={`region ${i + 1}`}
-              className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
-            />
-          ))}
-        </div>
       )}
       {isUser ? (
         <p className="whitespace-pre-wrap">{m.text}</p>
@@ -557,14 +539,9 @@ function turnsToDisplay(
       return { role: "memo", text: t.text, created_at: t.created_at };
     }
     let text = "";
-    const imagePreviewDataUrls: string[] = [];
     for (const block of t.content) {
       if (block.type === "text") {
         text += (text ? "\n" : "") + block.text;
-      } else if (block.type === "image") {
-        imagePreviewDataUrls.push(
-          `data:${block.source.media_type};base64,${block.source.data}`,
-        );
       }
     }
     if (t.role === "user") {
@@ -576,8 +553,6 @@ function turnsToDisplay(
     return {
       role: t.role,
       text,
-      imagePreviewDataUrls:
-        imagePreviewDataUrls.length > 0 ? imagePreviewDataUrls : undefined,
       created_at: t.created_at ?? fallbackCreatedAt,
     };
   });

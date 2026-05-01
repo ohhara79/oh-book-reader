@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 
-type Turn = {
-  role: "user" | "assistant";
-  content: ContentBlock[];
-};
+type Turn =
+  | { role: "user"; content: ContentBlock[] }
+  | { role: "assistant"; content: ContentBlock[] }
+  | { role: "memo"; text: string; created_at: number };
 
 type ContentBlock =
   | { type: "text"; text: string }
@@ -27,11 +27,17 @@ type Props = {
   onClose: () => void;
 };
 
-type DisplayMessage = {
-  role: "user" | "assistant";
-  text: string;
-  imagePreviewDataUrls?: string[];
-};
+type DisplayMessage =
+  | {
+      role: "user" | "assistant";
+      text: string;
+      imagePreviewDataUrls?: string[];
+    }
+  | {
+      role: "memo";
+      text: string;
+      created_at: number;
+    };
 
 export default function ConversationPanel({
   bookId,
@@ -43,6 +49,7 @@ export default function ConversationPanel({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [posting, setPosting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -55,6 +62,7 @@ export default function ConversationPanel({
     setQuestion("");
     setConversationId(null);
     setDeleting(false);
+    setPosting(false);
     newConvSentRef.current = false;
 
     if (!active) return;
@@ -82,7 +90,7 @@ export default function ConversationPanel({
     });
   }, [messages, streaming]);
 
-  async function startNewConversation(cap: CapturedSelection, q: string) {
+  async function startNewConversationAsk(cap: CapturedSelection, q: string) {
     setStreaming(true);
     setError(null);
     setMessages((prev) => [
@@ -102,6 +110,7 @@ export default function ConversationPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookId,
+          kind: "ask",
           spans: cap.spans.map((s) => ({
             page: s.page,
             bbox: s.bbox,
@@ -131,6 +140,73 @@ export default function ConversationPanel({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setStreaming(false);
+    }
+  }
+
+  async function startNewConversationMemo(cap: CapturedSelection, text: string) {
+    setPosting(true);
+    setError(null);
+    const now = Date.now();
+    setMessages((prev) => [
+      ...prev,
+      { role: "memo", text, created_at: now },
+    ]);
+    try {
+      const r = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          kind: "memo",
+          spans: cap.spans.map((s) => ({
+            page: s.page,
+            bbox: s.bbox,
+            imageBase64: s.imageBase64,
+            imageMediaType: s.imageMediaType,
+            selectionText: s.selectionText,
+            surroundingText: s.surroundingText,
+          })),
+          text,
+        }),
+      });
+      if (!r.ok) {
+        setError(`failed to save memo: ${r.status}`);
+        return;
+      }
+      const j = (await r.json()) as { conversationId: string };
+      setConversationId(j.conversationId);
+      onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function appendMemoToExisting(text: string) {
+    if (!conversationId) return;
+    setPosting(true);
+    setError(null);
+    const now = Date.now();
+    setMessages((prev) => [
+      ...prev,
+      { role: "memo", text, created_at: now },
+    ]);
+    try {
+      const r = await fetch(`/api/conversations/${conversationId}/memos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!r.ok) {
+        setError(`failed to save memo: ${r.status}`);
+        return;
+      }
+      onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPosting(false);
     }
   }
 
@@ -164,6 +240,7 @@ export default function ConversationPanel({
           }),
         onError: (m) => setError(m),
       });
+      onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -172,7 +249,7 @@ export default function ConversationPanel({
   }
 
   async function deleteConversation() {
-    if (!conversationId || streaming || deleting) return;
+    if (!conversationId || streaming || posting || deleting) return;
     if (
       !window.confirm(
         "Delete this conversation? The pin on the page will also be removed.",
@@ -199,29 +276,47 @@ export default function ConversationPanel({
     }
   }
 
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function submitAsk() {
     const q = question.trim();
-    if (!q || streaming) return;
+    if (!q || streaming || posting) return;
     setQuestion("");
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversation(active.capture, q);
+      void startNewConversationAsk(active.capture, q);
     } else if (conversationId) {
       void sendFollowup(q);
     }
   }
 
+  function submitMemo() {
+    const t = question.trim();
+    if (!t || streaming || posting) return;
+    setQuestion("");
+    if (active?.kind === "new" && !newConvSentRef.current) {
+      newConvSentRef.current = true;
+      void startNewConversationMemo(active.capture, t);
+    } else if (conversationId) {
+      void appendMemoToExisting(t);
+    }
+  }
+
+  function onAskSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    submitAsk();
+  }
+
   const isEmpty = !active;
+  const busy = streaming || posting;
+  const trimmed = question.trim();
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 text-sm dark:border-zinc-800">
         <span className="font-medium">
           {active?.kind === "new"
-            ? "New question"
+            ? "New entry"
             : active?.kind === "existing"
-              ? "Conversation"
+              ? "Thread"
               : "Ask Claude"}
         </span>
         {active && (
@@ -230,7 +325,7 @@ export default function ConversationPanel({
               <button
                 type="button"
                 onClick={deleteConversation}
-                disabled={streaming || deleting}
+                disabled={busy || deleting}
                 className="-mx-1 -my-1 px-3 py-2 text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:p-0 dark:text-red-400 dark:hover:text-red-300"
               >
                 {deleting ? "Deleting…" : "Delete"}
@@ -252,8 +347,9 @@ export default function ConversationPanel({
         {isEmpty ? (
           <p className="text-sm text-zinc-500">
             Drag a rectangle (or press and hold on touch) over a region of the
-            page to ask Claude about it. Your previous Q&A appear as amber pins
-            on the page — tap any pin to reopen the conversation.
+            page to start a thread. Use <strong>Memo</strong> to save your own
+            note, or <strong>Ask</strong> to query Claude. Memos appear inline
+            and Claude sees them as context on the next Ask.
           </p>
         ) : (
           <div className="space-y-4">
@@ -261,7 +357,15 @@ export default function ConversationPanel({
               <PreviewBox capture={active.capture} />
             )}
             {messages.map((m, i) => (
-              <MessageBubble key={i} m={m} streaming={streaming && i === messages.length - 1 && m.role === "assistant"} />
+              <MessageBubble
+                key={i}
+                m={m}
+                streaming={
+                  streaming &&
+                  i === messages.length - 1 &&
+                  m.role === "assistant"
+                }
+              />
             ))}
           </div>
         )}
@@ -274,31 +378,43 @@ export default function ConversationPanel({
 
       {active && (
         <form
-          onSubmit={onSubmit}
+          onSubmit={onAskSubmit}
           className="border-t border-zinc-200 p-3 dark:border-zinc-800"
         >
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            disabled={streaming}
+            disabled={busy}
             rows={3}
-            placeholder={
-              active.kind === "new"
-                ? "What do you want to know about this region?"
-                : "Follow-up…"
-            }
+            placeholder="Write a memo or ask a question. Markdown + math supported."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                onSubmit(e as unknown as React.FormEvent);
+                submitAsk();
               }
             }}
           />
-          <div className="mt-2 flex justify-end">
+          {trimmed && (
+            <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+                Preview
+              </p>
+              <MathMarkdown text={question} />
+            </div>
+          )}
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={submitMemo}
+              disabled={busy || !trimmed}
+              className="rounded border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-3 md:py-1 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              {posting ? "Saving…" : "Memo"}
+            </button>
             <button
               type="submit"
-              disabled={streaming || !question.trim()}
+              disabled={busy || !trimmed}
               className="rounded bg-zinc-900 px-4 py-2 text-sm text-white active:bg-zinc-700 disabled:opacity-50 md:px-3 md:py-1 dark:bg-zinc-100 dark:text-black dark:active:bg-zinc-300"
             >
               {streaming ? "Asking…" : "Ask"}
@@ -348,6 +464,13 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
   );
 }
 
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 function MessageBubble({
   m,
   streaming,
@@ -355,6 +478,16 @@ function MessageBubble({
   m: DisplayMessage;
   streaming: boolean;
 }) {
+  if (m.role === "memo") {
+    return (
+      <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+        <p className="mb-1 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
+          memo · {formatTime(m.created_at)}
+        </p>
+        <MathMarkdown text={m.text} />
+      </div>
+    );
+  }
   const isUser = m.role === "user";
   const images = m.imagePreviewDataUrls ?? [];
   return (
@@ -393,7 +526,10 @@ function MessageBubble({
 }
 
 function turnsToDisplay(turns: Turn[]): DisplayMessage[] {
-  return turns.map((t) => {
+  return turns.map((t): DisplayMessage => {
+    if (t.role === "memo") {
+      return { role: "memo", text: t.text, created_at: t.created_at };
+    }
     let text = "";
     const imagePreviewDataUrls: string[] = [];
     for (const block of t.content) {

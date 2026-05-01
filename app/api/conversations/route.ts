@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import {
-  type ContentBlock,
   type Conversation,
   type Selection,
   type SelectionSpan,
@@ -12,6 +11,7 @@ import {
 } from "@/lib/store";
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
+import { buildFirstUserContent } from "@/lib/promptParts";
 
 export const runtime = "nodejs";
 
@@ -24,20 +24,35 @@ type SpanInput = {
   surroundingText?: string;
 };
 
-type Body = {
-  bookId: string;
-  spans: SpanInput[];
-  question: string;
-};
+type Body =
+  | {
+      bookId: string;
+      spans: SpanInput[];
+      kind?: "ask";
+      question: string;
+    }
+  | {
+      bookId: string;
+      spans: SpanInput[];
+      kind: "memo";
+      text: string;
+    };
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as Body;
   if (
     !body?.bookId ||
-    !body?.question ||
     !Array.isArray(body.spans) ||
     body.spans.length === 0
   ) {
+    return new Response("bad request", { status: 400 });
+  }
+
+  const kind = body.kind ?? "ask";
+  if (kind === "ask" && !("question" in body && body.question)) {
+    return new Response("bad request", { status: 400 });
+  }
+  if (kind === "memo" && !("text" in body && body.text)) {
     return new Response("bad request", { status: 400 });
   }
 
@@ -54,15 +69,35 @@ export async function POST(req: NextRequest) {
     spans,
     created_at: now,
   };
-  const imageBuffers = body.spans.map((s) => Buffer.from(s.imageBase64, "base64"));
+  const imageBuffers = body.spans.map((s) =>
+    Buffer.from(s.imageBase64, "base64"),
+  );
   await saveSelection(selection, imageBuffers);
 
-  const firstUserContent = buildFirstUserContent(body);
+  if (kind === "memo") {
+    const memoBody = body as Extract<Body, { kind: "memo" }>;
+    const conversation: Conversation = {
+      id: newConversationId(),
+      selection_id: selection.id,
+      title: memoBody.text.slice(0, 80),
+      created_at: now,
+      updated_at: now,
+      messages: [{ role: "memo", text: memoBody.text, created_at: now }],
+    };
+    await saveConversation(body.bookId, conversation);
+    return Response.json({
+      conversationId: conversation.id,
+      selectionId: selection.id,
+    });
+  }
+
+  const askBody = body as Extract<Body, { kind?: "ask" }>;
+  const firstUserContent = buildFirstUserContent(body.spans, askBody.question);
 
   const conversation: Conversation = {
     id: newConversationId(),
     selection_id: selection.id,
-    title: body.question.slice(0, 80),
+    title: askBody.question.slice(0, 80),
     created_at: now,
     updated_at: now,
     messages: [],
@@ -105,7 +140,6 @@ export async function POST(req: NextRequest) {
             content: [{ type: "text", text: assistantText }],
           },
         ]);
-        // Persist sessionId so follow-ups can resume.
         if (sessionId) {
           const conv = await import("@/lib/store").then((m) =>
             m.getConversation(body.bookId, conversation.id),
@@ -129,69 +163,4 @@ export async function POST(req: NextRequest) {
   });
 
   return new Response(stream, { headers: SSE_HEADERS });
-}
-
-function buildFirstUserContent(body: Body): ContentBlock[] {
-  const out: ContentBlock[] = [];
-  if (body.spans.length === 1) {
-    const s = body.spans[0];
-    out.push(
-      {
-        type: "text",
-        text: `Selected text from page ${s.page}:\n${
-          s.selectionText || "(no text layer; rely on the image)"
-        }`,
-      },
-      {
-        type: "text",
-        text: `Surrounding page text:\n${s.surroundingText || "(none)"}`,
-      },
-      {
-        type: "image",
-        source: {
-          type: "base64",
-          media_type: s.imageMediaType ?? "image/png",
-          data: s.imageBase64,
-        },
-      },
-      { type: "text", text: `Question: ${body.question}` },
-    );
-    return out;
-  }
-
-  const firstPage = body.spans[0].page;
-  const lastPage = body.spans[body.spans.length - 1].page;
-  out.push({
-    type: "text",
-    text: `The user selected a region that spans pages ${firstPage}–${lastPage}. The selected content for each page is shown below in reading order.`,
-  });
-  for (const s of body.spans) {
-    out.push({
-      type: "text",
-      text: `Page ${s.page} — selected text:\n${
-        s.selectionText || "(no text layer; rely on the image)"
-      }`,
-    });
-    out.push({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: s.imageMediaType ?? "image/png",
-        data: s.imageBase64,
-      },
-    });
-  }
-  out.push({
-    type: "text",
-    text: body.spans
-      .map(
-        (s) =>
-          `Surrounding text from page ${s.page}:\n${
-            s.surroundingText || "(none)"
-          }`,
-      )
-      .join("\n\n"),
-  });
-  out.push({ type: "text", text: `Question: ${body.question}` });
-  return out;
 }

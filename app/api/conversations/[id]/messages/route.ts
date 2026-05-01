@@ -2,16 +2,59 @@ import { NextRequest } from "next/server";
 import {
   type ContentBlock,
   type Conversation,
+  type Turn,
   appendMessages,
   findConversationBookId,
   getConversation,
+  getSelection,
+  readSelectionImage,
 } from "@/lib/store";
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
+import {
+  buildMemoBlocks,
+  buildQuestionBlock,
+  buildSelectionBlocks,
+  type PromptSpan,
+} from "@/lib/promptParts";
 
 export const runtime = "nodejs";
 
 type Body = { question: string };
+
+function unsentMemos(messages: Turn[]): { text: string }[] {
+  let lastAssistant = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") {
+      lastAssistant = i;
+      break;
+    }
+  }
+  const out: { text: string }[] = [];
+  for (let i = lastAssistant + 1; i < messages.length; i++) {
+    const t = messages[i];
+    if (t.role === "memo") out.push({ text: t.text });
+  }
+  return out;
+}
+
+async function loadSelectionAsPromptSpans(
+  bookId: string,
+  selectionId: string,
+): Promise<PromptSpan[]> {
+  const selection = await getSelection(bookId, selectionId);
+  return Promise.all(
+    selection.spans.map(async (s, i) => ({
+      page: s.page,
+      imageBase64: (
+        await readSelectionImage(bookId, selectionId, i)
+      ).toString("base64"),
+      imageMediaType: "image/png" as const,
+      selectionText: s.extracted_text,
+      surroundingText: s.surrounding_text,
+    })),
+  );
+}
 
 export async function POST(
   req: NextRequest,
@@ -28,9 +71,23 @@ export async function POST(
     session_id?: string;
   };
 
-  const followupContent: ContentBlock[] = [
-    { type: "text", text: body.question },
-  ];
+  const memoBlocks = buildMemoBlocks(unsentMemos(conv.messages));
+  const questionBlock = buildQuestionBlock(body.question);
+
+  let followupContent: ContentBlock[];
+  if (!conv.session_id) {
+    const promptSpans = await loadSelectionAsPromptSpans(
+      bookId,
+      conv.selection_id,
+    );
+    followupContent = [
+      ...buildSelectionBlocks(promptSpans),
+      ...memoBlocks,
+      questionBlock,
+    ];
+  } else {
+    followupContent = [...memoBlocks, questionBlock];
+  }
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

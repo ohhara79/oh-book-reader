@@ -16,10 +16,10 @@ export type ContentBlock =
       };
     };
 
-export type Turn = {
-  role: "user" | "assistant";
-  content: ContentBlock[];
-};
+export type Turn =
+  | { role: "user"; content: ContentBlock[] }
+  | { role: "assistant"; content: ContentBlock[] }
+  | { role: "memo"; text: string; created_at: number };
 
 export type BookMeta = {
   id: string;
@@ -312,6 +312,19 @@ export async function appendMessages(
   const conv = await getConversation(bookId, conversationId);
   conv.messages.push(...turns);
   conv.updated_at = Date.now();
+  await saveConversation(bookId, conv);
+  return conv;
+}
+
+export async function appendMemoTurn(
+  bookId: string,
+  conversationId: string,
+  text: string,
+): Promise<Conversation> {
+  const conv = await getConversation(bookId, conversationId);
+  const now = Date.now();
+  conv.messages.push({ role: "memo", text, created_at: now });
+  conv.updated_at = now;
   await saveConversation(bookId, conv);
   return conv;
 }

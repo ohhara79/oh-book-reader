@@ -491,7 +491,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     : sidebarHidden
       ? "hidden"
       : "hidden md:block md:shrink-0 md:w-[var(--sidebar-w)]";
-  const asideClass = `${layoutClass} w-full overflow-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black`;
+  const asideClass = `${layoutClass} w-full overflow-auto border-l border-zinc-200 bg-white print:!static print:!z-auto print:!block print:!w-full print:!overflow-visible print:!border-0 dark:border-zinc-800 dark:bg-black`;
 
   const asideStyle = {
     ["--sidebar-w" as string]: `${sidebarWidth}px`,
@@ -503,8 +503,8 @@ export default function Reader({ bookId }: { bookId: string }) {
   }, [numPages]);
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-y-1 border-b border-zinc-200 bg-white px-4 py-2 dark:border-zinc-800 dark:bg-black">
+    <div className="flex h-screen flex-col print:block print:h-auto">
+      <header className="flex flex-wrap items-center justify-between gap-y-1 border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
             href="/"
@@ -592,10 +592,10 @@ export default function Reader({ bookId }: { bookId: string }) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
         <main
           ref={mainRef}
-          className="flex-1 overflow-auto bg-zinc-100 p-6 dark:bg-zinc-900"
+          className="flex-1 overflow-auto bg-zinc-100 p-6 print:hidden dark:bg-zinc-900"
         >
           <Document
             file={fileProp}
@@ -679,7 +679,7 @@ function Splitter({ onDrag }: { onDrag: (clientX: number) => void }) {
     <div
       role="separator"
       aria-orientation="vertical"
-      className="hidden w-1 shrink-0 cursor-col-resize bg-zinc-200 hover:bg-zinc-400 active:bg-zinc-500 md:block dark:bg-zinc-800 dark:hover:bg-zinc-600"
+      className="hidden w-1 shrink-0 cursor-col-resize bg-zinc-200 hover:bg-zinc-400 active:bg-zinc-500 md:block print:!hidden dark:bg-zinc-800 dark:hover:bg-zinc-600"
       onPointerDown={(e) => {
         e.preventDefault();
         const target = e.currentTarget;

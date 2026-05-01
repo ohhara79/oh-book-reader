@@ -39,7 +39,7 @@ export default function CopyButton({ text, title = "Copy", className }: Props) {
       disabled={disabled}
       title={copied ? "Copied!" : title}
       aria-label={copied ? "Copied" : title}
-      className={`inline-flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100 ${className ?? ""}`}
+      className={`inline-flex h-6 w-6 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 print:hidden dark:hover:text-zinc-100 ${className ?? ""}`}
     >
       {copied ? (
         <svg

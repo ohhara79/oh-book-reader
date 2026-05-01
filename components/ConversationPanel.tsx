@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
 import { formatTimestamp } from "@/lib/formatTimestamp";
+import type { Conversation } from "@/lib/store";
+import {
+  conversationToMarkdown,
+  extractUserQuestion,
+} from "@/lib/exportConversation";
+import {
+  conversationFilename,
+  copyConversationMarkdown,
+  downloadConversationMarkdown,
+} from "@/lib/exportConversation.client";
 
 type Turn =
   | { role: "user"; content: ContentBlock[]; created_at?: number }
@@ -49,8 +59,13 @@ export default function ConversationPanel({
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [rawConversation, setRawConversation] = useState<Conversation | null>(
+    null,
+  );
   const [existingCapture, setExistingCapture] =
     useState<CapturedSelection | null>(null);
+  const [copiedThread, setCopiedThread] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [question, setQuestion] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -65,9 +80,15 @@ export default function ConversationPanel({
     setMessages([]);
     setQuestion("");
     setConversationId(null);
+    setRawConversation(null);
     setExistingCapture(null);
     setDeleting(false);
     setPosting(false);
+    setCopiedThread(false);
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = null;
+    }
     newConvSentRef.current = false;
 
     if (!active) return;
@@ -80,14 +101,11 @@ export default function ConversationPanel({
           return;
         }
         const j = (await r.json()) as {
-          conversation: {
-            id: string;
-            created_at: number;
-            messages: Turn[];
-          };
+          conversation: Conversation;
           capture: CapturedSelection | null;
         };
         setConversationId(j.conversation.id);
+        setRawConversation(j.conversation);
         setMessages(
           turnsToDisplay(j.conversation.messages, j.conversation.created_at),
         );
@@ -102,6 +120,42 @@ export default function ConversationPanel({
       behavior: "smooth",
     });
   }, [messages, streaming]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
+
+  const exportMarkdown = useMemo(() => {
+    if (!rawConversation) return "";
+    return conversationToMarkdown({
+      conversation: rawConversation,
+      capture: existingCapture,
+    });
+  }, [rawConversation, existingCapture]);
+
+  async function onCopyThread() {
+    if (!exportMarkdown) return;
+    const ok = await copyConversationMarkdown(exportMarkdown);
+    if (!ok) return;
+    setCopiedThread(true);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopiedThread(false), 1500);
+  }
+
+  function onDownloadThread() {
+    if (!exportMarkdown || !rawConversation) return;
+    const filename = conversationFilename({
+      title: rawConversation.title ?? "",
+      conversationId: rawConversation.id,
+    });
+    downloadConversationMarkdown(exportMarkdown, filename);
+  }
+
+  function onPrintThread() {
+    if (typeof window !== "undefined") window.print();
+  }
 
   async function startNewConversationAsk(cap: CapturedSelection, q: string) {
     setStreaming(true);
@@ -331,8 +385,8 @@ export default function ConversationPanel({
   const trimmed = question.trim();
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 text-sm dark:border-zinc-800">
+    <div className="flex h-full flex-col print:h-auto">
+      <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 text-sm print:hidden dark:border-zinc-800">
         <span className="font-medium">
           {active?.kind === "new"
             ? "New entry"
@@ -343,14 +397,43 @@ export default function ConversationPanel({
         {active && (
           <div className="flex items-center gap-3">
             {active.kind === "existing" && conversationId && (
-              <button
-                type="button"
-                onClick={deleteConversation}
-                disabled={busy || deleting}
-                className="-mx-1 -my-1 px-3 py-2 text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:p-0 dark:text-red-400 dark:hover:text-red-300"
-              >
-                {deleting ? "Deleting…" : "Delete"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={onCopyThread}
+                  disabled={busy || deleting || !exportMarkdown}
+                  title="Copy entire thread as Markdown"
+                  className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:p-0 dark:hover:text-zinc-100"
+                >
+                  {copiedThread ? "Copied" : "Copy"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onDownloadThread}
+                  disabled={busy || deleting || !exportMarkdown}
+                  title="Download thread as Markdown (.md)"
+                  className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:p-0 dark:hover:text-zinc-100"
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  onClick={onPrintThread}
+                  disabled={busy || deleting || !exportMarkdown}
+                  title="Print or save as PDF"
+                  className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:p-0 dark:hover:text-zinc-100"
+                >
+                  Print
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteConversation}
+                  disabled={busy || deleting}
+                  className="-mx-1 -my-1 px-3 py-2 text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:p-0 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  {deleting ? "Deleting…" : "Delete"}
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -363,8 +446,13 @@ export default function ConversationPanel({
           </div>
         )}
       </div>
+      {rawConversation && (
+        <h1 className="hidden px-4 pt-6 pb-2 text-2xl font-semibold print:block">
+          {rawConversation.title}
+        </h1>
+      )}
 
-      <div ref={scrollerRef} className="flex-1 overflow-auto px-4 py-3">
+      <div ref={scrollerRef} className="flex-1 overflow-auto px-4 py-3 print:overflow-visible">
         {isEmpty ? (
           <p className="text-sm text-zinc-500">
             Drag a rectangle (or press and hold on touch) over a region of the
@@ -392,7 +480,7 @@ export default function ConversationPanel({
           </div>
         )}
         {error && (
-          <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">
+          <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-700 print:hidden dark:bg-red-950 dark:text-red-300">
             {error}
           </p>
         )}
@@ -401,7 +489,7 @@ export default function ConversationPanel({
       {active && (
         <form
           onSubmit={onAskSubmit}
-          className="border-t border-zinc-200 p-3 dark:border-zinc-800"
+          className="border-t border-zinc-200 p-3 print:hidden dark:border-zinc-800"
         >
           <textarea
             value={question}
@@ -538,7 +626,7 @@ function MessageBubble({
         <>
           <MathMarkdown text={m.text || (streaming ? "…" : "")} />
           {streaming && m.text && (
-            <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-zinc-400" />
+            <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-zinc-400 print:hidden" />
           )}
         </>
       )}
@@ -561,10 +649,9 @@ function turnsToDisplay(
       }
     }
     if (t.role === "user") {
-      // Strip our prompt-template prefixes from the very first user turn so
-      // the UI only shows the user's actual question.
-      const m = text.match(/Question:\s*([\s\S]*)$/);
-      if (m) text = m[1].trim();
+      // Strip our prompt-template prefixes so the UI only shows the user's
+      // actual question. Shared with the markdown export.
+      text = extractUserQuestion(text);
     }
     return {
       role: t.role,

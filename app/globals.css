@@ -37,3 +37,15 @@ body {
   pointer-events: none !important;
   user-select: none !important;
 }
+
+@media print {
+  @page { margin: 0.75in; }
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+  /* keep bubbles from splitting awkwardly across pages */
+  .rounded { break-inside: avoid; }
+  /* honor inline images (selection captures) */
+  img { max-width: 100% !important; height: auto !important; }
+}

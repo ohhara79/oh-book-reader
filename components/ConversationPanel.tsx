@@ -396,53 +396,174 @@ export default function ConversationPanel({
               : "Ask Claude"}
         </span>
         {active && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             {active.kind === "existing" && conversationId && (
               <>
                 <button
                   type="button"
                   onClick={onCopyThread}
                   disabled={busy || deleting || !exportMarkdown}
-                  title="Copy entire thread as Markdown"
-                  className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:p-0 dark:hover:text-zinc-100"
+                  title={copiedThread ? "Copied!" : "Copy entire thread as Markdown"}
+                  aria-label={copiedThread ? "Copied" : "Copy entire thread as Markdown"}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
                 >
-                  {copiedThread ? "Copied" : "Copy"}
+                  {copiedThread ? (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 8.5l3.2 3.2L13 5" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="5" y="5" width="8" height="8" rx="1.5" />
+                      <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" />
+                    </svg>
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={onDownloadThread}
                   disabled={busy || deleting || !exportMarkdown}
                   title="Download thread as Markdown (.md)"
-                  className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:p-0 dark:hover:text-zinc-100"
+                  aria-label="Download thread as Markdown"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
                 >
-                  Download
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 2v8" />
+                    <path d="M5 7l3 3 3-3" />
+                    <path d="M3 13h10" />
+                  </svg>
                 </button>
                 <button
                   type="button"
                   onClick={onPrintThread}
                   disabled={busy || deleting || !exportMarkdown}
                   title="Print or save as PDF"
-                  className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:p-0 dark:hover:text-zinc-100"
+                  aria-label="Print or save as PDF"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
                 >
-                  Print
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 6V3h8v3" />
+                    <rect x="2.5" y="6" width="11" height="5" rx="1" />
+                    <rect x="4.5" y="9" width="7" height="4" />
+                  </svg>
                 </button>
                 <button
                   type="button"
                   onClick={deleteConversation}
                   disabled={busy || deleting}
-                  className="-mx-1 -my-1 px-3 py-2 text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:p-0 dark:text-red-400 dark:hover:text-red-300"
+                  title={deleting ? "Deleting…" : "Delete"}
+                  aria-label={deleting ? "Deleting" : "Delete"}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
                 >
-                  {deleting ? "Deleting…" : "Delete"}
+                  {deleting ? (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      className="animate-spin"
+                      aria-hidden="true"
+                    >
+                      <path d="M14 8a6 6 0 1 1-6-6" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 5h10" />
+                      <path d="M6 5V3.5A1 1 0 0 1 7 3h2a1 1 0 0 1 1 1V5" />
+                      <path d="M5 5l1 8a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-8" />
+                    </svg>
+                  )}
                 </button>
               </>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="-mx-1 -my-1 px-3 py-2 text-zinc-500 hover:text-zinc-900 active:opacity-70 md:p-0 dark:hover:text-zinc-100"
+              title="Close"
+              aria-label="Close"
+              className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 md:h-7 md:w-7 dark:hover:text-zinc-100"
             >
-              <span className="md:hidden">← Back</span>
-              <span className="hidden md:inline">Close</span>
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="md:hidden"
+              >
+                <path d="M10 4 5 8l5 4" />
+              </svg>
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="hidden md:block"
+              >
+                <path d="M4 4l8 8" />
+                <path d="M12 4l-8 8" />
+              </svg>
             </button>
           </div>
         )}

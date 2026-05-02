@@ -476,7 +476,7 @@ export default function ConversationPanel({
                 type="button"
                 onClick={startTitleEdit}
                 title="Rename thread"
-                className="block w-full truncate rounded px-1.5 py-0.5 text-left font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="block w-full break-words rounded px-1.5 py-0.5 text-left font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >
                 {rawConversation.title || "Untitled"}
               </button>

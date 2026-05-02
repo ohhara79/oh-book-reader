@@ -212,7 +212,7 @@ export default function ThreadList({
                 className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  <span className="break-words text-sm font-medium text-zinc-900 dark:text-zinc-100">
                     {r.conv.title || "Untitled"}
                   </span>
                   <span className="shrink-0 text-[10px] uppercase tracking-wide text-zinc-500">

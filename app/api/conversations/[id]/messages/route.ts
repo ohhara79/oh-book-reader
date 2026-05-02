@@ -20,14 +20,24 @@ import {
   type PromptSpan,
   validateAttachments,
 } from "@/lib/promptParts";
+import { validateReferencedThreadIds } from "@/lib/referencedThreads";
+import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
 
 export const runtime = "nodejs";
 
-type Body = { question: string; attachments?: unknown };
+type Body = {
+  question: string;
+  attachments?: unknown;
+  referencedThreadIds?: unknown;
+};
 
-function unsentMemos(
-  messages: Turn[],
-): { text: string; attachments?: AttachedImage[] }[] {
+type UnsentMemo = {
+  text: string;
+  attachments?: AttachedImage[];
+  referencedThreadIds?: string[];
+};
+
+function unsentMemos(messages: Turn[]): UnsentMemo[] {
   let lastAssistant = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "assistant") {
@@ -35,11 +45,15 @@ function unsentMemos(
       break;
     }
   }
-  const out: { text: string; attachments?: AttachedImage[] }[] = [];
+  const out: UnsentMemo[] = [];
   for (let i = lastAssistant + 1; i < messages.length; i++) {
     const t = messages[i];
     if (t.role === "memo") {
-      out.push({ text: t.text, attachments: t.attachments });
+      out.push({
+        text: t.text,
+        attachments: t.attachments,
+        referencedThreadIds: t.referenced_thread_ids,
+      });
     }
   }
   return out;
@@ -77,6 +91,15 @@ export async function POST(
   }
   const attachments = attachmentsResult;
 
+  const referencedIdsResult = validateReferencedThreadIds(
+    body.referencedThreadIds,
+    { excludeId: conversationId },
+  );
+  if ("error" in referencedIdsResult) {
+    return new Response(referencedIdsResult.error, { status: 400 });
+  }
+  const turnReferencedIds = referencedIdsResult;
+
   const bookId = await findConversationBookId(conversationId);
   if (!bookId) return new Response("not found", { status: 404 });
 
@@ -84,9 +107,26 @@ export async function POST(
     session_id?: string;
   };
 
-  const memoBlocks = buildMemoBlocks(unsentMemos(conv.messages));
+  const memos = unsentMemos(conv.messages);
+  const memoBlocks = buildMemoBlocks(memos);
   const questionBlock = buildQuestionBlock(body.question);
   const attachmentBlocks = attachmentImageBlocks(attachments);
+
+  const aggregatedRefIds: string[] = [];
+  const seenRefIds = new Set<string>([conversationId]);
+  for (const memo of memos) {
+    for (const id of memo.referencedThreadIds ?? []) {
+      if (seenRefIds.has(id)) continue;
+      seenRefIds.add(id);
+      aggregatedRefIds.push(id);
+    }
+  }
+  for (const id of turnReferencedIds) {
+    if (seenRefIds.has(id)) continue;
+    seenRefIds.add(id);
+    aggregatedRefIds.push(id);
+  }
+  const referencedBlocks = await loadReferencedThreadBlocks(aggregatedRefIds);
 
   let followupContent: ContentBlock[];
   if (!conv.session_id) {
@@ -95,13 +135,19 @@ export async function POST(
       conv.selection_id,
     );
     followupContent = [
+      ...referencedBlocks,
       ...buildSelectionBlocks(promptSpans),
       ...memoBlocks,
       questionBlock,
       ...attachmentBlocks,
     ];
   } else {
-    followupContent = [...memoBlocks, questionBlock, ...attachmentBlocks];
+    followupContent = [
+      ...referencedBlocks,
+      ...memoBlocks,
+      questionBlock,
+      ...attachmentBlocks,
+    ];
   }
 
   const userCreatedAt = Date.now();
@@ -139,6 +185,9 @@ export async function POST(
           created_at: userCreatedAt,
         };
         if (attachments.length > 0) userTurn.attachments = attachments;
+        if (turnReferencedIds.length > 0) {
+          userTurn.referenced_thread_ids = turnReferencedIds;
+        }
         await appendMessages(bookId, conv.id, [
           userTurn,
           {

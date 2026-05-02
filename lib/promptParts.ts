@@ -110,8 +110,10 @@ export function buildFirstUserContent(
   spans: PromptSpan[],
   question: string,
   attachments?: AttachedImage[],
+  referencedThreadBlocks?: ContentBlock[],
 ): ContentBlock[] {
   return [
+    ...(referencedThreadBlocks ?? []),
     ...buildSelectionBlocks(spans),
     buildQuestionBlock(question),
     ...attachmentImageBlocks(attachments),

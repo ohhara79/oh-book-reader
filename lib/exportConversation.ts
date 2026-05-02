@@ -56,16 +56,24 @@ function attachmentMarkdown(t: Turn): string {
   return lines.join("\n");
 }
 
+function referencedThreadsMarkdown(t: Turn): string {
+  if (t.role === "assistant") return "";
+  const ids = t.referenced_thread_ids;
+  if (!ids || ids.length === 0) return "";
+  return `\n\n_Referenced threads: ${ids.join(", ")}_\n`;
+}
+
 function turnSection(t: Turn, fallbackTs: number): string {
   const ts = t.created_at ?? fallbackTs;
   const stamp = formatTimestamp(ts);
   const body = turnText(t).trim();
   const tail = attachmentMarkdown(t);
+  const refs = referencedThreadsMarkdown(t);
   if (t.role === "memo") {
-    return `#### Memo · ${stamp}\n\n${body}${tail}\n`;
+    return `#### Memo · ${stamp}\n\n${body}${tail}${refs}\n`;
   }
   const heading = t.role === "user" ? "You" : "AI";
-  return `### ${heading} · ${stamp}\n\n${body}${tail}\n`;
+  return `### ${heading} · ${stamp}\n\n${body}${tail}${refs}\n`;
 }
 
 export function conversationToMarkdown(args: {

@@ -13,6 +13,8 @@ import {
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 import { buildFirstUserContent, validateAttachments } from "@/lib/promptParts";
+import { validateReferencedThreadIds } from "@/lib/referencedThreads";
+import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
 
 export const runtime = "nodejs";
 
@@ -32,6 +34,7 @@ type Body =
       kind?: "ask";
       question: string;
       attachments?: unknown;
+      referencedThreadIds?: unknown;
     }
   | {
       bookId: string;
@@ -39,6 +42,7 @@ type Body =
       kind: "memo";
       text: string;
       attachments?: unknown;
+      referencedThreadIds?: unknown;
     };
 
 export async function POST(req: NextRequest) {
@@ -64,6 +68,14 @@ export async function POST(req: NextRequest) {
     return new Response(attachmentsResult.error, { status: 400 });
   }
   const attachments = attachmentsResult;
+
+  const referencedIdsResult = validateReferencedThreadIds(
+    body.referencedThreadIds,
+  );
+  if ("error" in referencedIdsResult) {
+    return new Response(referencedIdsResult.error, { status: 400 });
+  }
+  const referencedThreadIds = referencedIdsResult;
 
   const now = Date.now();
   const spans: SelectionSpan[] = body.spans.map((s) => ({
@@ -91,6 +103,9 @@ export async function POST(req: NextRequest) {
       created_at: now,
     };
     if (attachments.length > 0) memoTurn.attachments = attachments;
+    if (referencedThreadIds.length > 0) {
+      memoTurn.referenced_thread_ids = referencedThreadIds;
+    }
     const conversation: Conversation = {
       id: newConversationId(),
       selection_id: selection.id,
@@ -107,10 +122,14 @@ export async function POST(req: NextRequest) {
   }
 
   const askBody = body as Extract<Body, { kind?: "ask" }>;
+  const referencedBlocks = await loadReferencedThreadBlocks(
+    referencedThreadIds,
+  );
   const firstUserContent = buildFirstUserContent(
     body.spans,
     askBody.question,
     attachments,
+    referencedBlocks,
   );
 
   const conversation: Conversation = {
@@ -158,6 +177,9 @@ export async function POST(req: NextRequest) {
           created_at: now,
         };
         if (attachments.length > 0) userTurn.attachments = attachments;
+        if (referencedThreadIds.length > 0) {
+          userTurn.referenced_thread_ids = referencedThreadIds;
+        }
         await appendMessages(body.bookId, conversation.id, [
           userTurn,
           {

@@ -24,6 +24,7 @@ export type Turn =
       role: "user";
       content: ContentBlock[];
       attachments?: AttachedImage[];
+      referenced_thread_ids?: string[];
       created_at?: number;
     }
   | { role: "assistant"; content: ContentBlock[]; created_at?: number }
@@ -31,6 +32,7 @@ export type Turn =
       role: "memo";
       text: string;
       attachments?: AttachedImage[];
+      referenced_thread_ids?: string[];
       created_at: number;
     };
 
@@ -334,11 +336,15 @@ export async function appendMemoTurn(
   conversationId: string,
   text: string,
   attachments?: AttachedImage[],
+  referencedThreadIds?: string[],
 ): Promise<Conversation> {
   const conv = await getConversation(bookId, conversationId);
   const now = Date.now();
   const memo: Turn = { role: "memo", text, created_at: now };
   if (attachments && attachments.length > 0) memo.attachments = attachments;
+  if (referencedThreadIds && referencedThreadIds.length > 0) {
+    memo.referenced_thread_ids = referencedThreadIds;
+  }
   conv.messages.push(memo);
   conv.updated_at = now;
   await saveConversation(bookId, conv);

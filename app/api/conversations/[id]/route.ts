@@ -9,10 +9,9 @@ import {
   readSelectionImage,
   saveConversation,
 } from "@/lib/store";
+import { CONVERSATION_ID_RE } from "@/lib/referencedThreads";
 
 export const runtime = "nodejs";
-
-const CONVERSATION_ID_RE = /^c_[0-9A-HJKMNP-TV-Z]+$/;
 
 export async function GET(
   _req: NextRequest,

@@ -14,6 +14,10 @@ import {
   isAttachmentMediaType,
 } from "@/lib/attachments";
 import {
+  MAX_REFERENCED_THREADS_PER_TURN,
+  parseReferencedThreadFromUrl,
+} from "@/lib/referencedThreads";
+import {
   conversationToMarkdown,
   extractUserQuestion,
   selectionSection,
@@ -72,6 +76,19 @@ function fileToAttachment(file: File): Promise<AttachedImage> {
   });
 }
 
+type ReferencedThread = {
+  conversationId: string;
+  title: string;
+  pageLabel: string;
+};
+
+function pageLabelFromCapture(capture: CapturedSelection | null): string {
+  if (!capture || capture.spans.length === 0) return "";
+  const first = capture.spans[0].page;
+  const last = capture.spans[capture.spans.length - 1].page;
+  return first === last ? `page ${first}` : `pages ${first}–${last}`;
+}
+
 type ActiveConversation =
   | { kind: "new"; capture: CapturedSelection }
   | { kind: "existing"; conversationId: string };
@@ -93,6 +110,7 @@ type DisplayMessage =
       role: "user";
       text: string;
       attachments?: AttachedImage[];
+      referencedThreadIds?: string[];
       created_at?: number;
     }
   | {
@@ -104,6 +122,7 @@ type DisplayMessage =
       role: "memo";
       text: string;
       attachments?: AttachedImage[];
+      referencedThreadIds?: string[];
       created_at: number;
     };
 
@@ -127,6 +146,12 @@ export default function ConversationPanel({
     useState<CapturedSelection | null>(null);
   const [question, setQuestion] = useState("");
   const [attachments, setAttachments] = useState<AttachedImage[]>([]);
+  const [referencedThreads, setReferencedThreads] = useState<
+    ReferencedThread[]
+  >([]);
+  const [refInputOpen, setRefInputOpen] = useState(false);
+  const [refInputValue, setRefInputValue] = useState("");
+  const [resolvingRef, setResolvingRef] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -178,12 +203,75 @@ export default function ConversationPanel({
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
+  async function addReferencedThreadFromInput(input: string) {
+    const id = parseReferencedThreadFromUrl(input);
+    if (!id) {
+      setError("not a valid thread URL or id");
+      return false;
+    }
+    if (id === conversationId) {
+      setError("cannot reference the current thread");
+      return false;
+    }
+    if (referencedThreads.some((r) => r.conversationId === id)) {
+      setError("already referenced");
+      return false;
+    }
+    if (referencedThreads.length >= MAX_REFERENCED_THREADS_PER_TURN) {
+      setError(`max ${MAX_REFERENCED_THREADS_PER_TURN} referenced threads`);
+      return false;
+    }
+    setResolvingRef(true);
+    try {
+      const r = await fetch(`/api/conversations/${id}`);
+      if (!r.ok) {
+        setError(`could not load thread (${r.status})`);
+        return false;
+      }
+      const j = (await r.json()) as {
+        conversation: Conversation;
+        capture: CapturedSelection | null;
+      };
+      const ref: ReferencedThread = {
+        conversationId: j.conversation.id,
+        title: j.conversation.title?.trim() || "Untitled",
+        pageLabel: pageLabelFromCapture(j.capture),
+      };
+      setReferencedThreads((prev) => [...prev, ref]);
+      setError(null);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return false;
+    } finally {
+      setResolvingRef(false);
+    }
+  }
+
+  function removeReferencedThread(index: number) {
+    setReferencedThreads((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function submitRefInput() {
+    const v = refInputValue.trim();
+    if (!v) return;
+    const ok = await addReferencedThreadFromInput(v);
+    if (ok) {
+      setRefInputValue("");
+      setRefInputOpen(false);
+    }
+  }
+
   // Reset / load when `active` changes (controlled by `key` from parent).
   useEffect(() => {
     setError(null);
     setMessages([]);
     setQuestion("");
     setAttachments([]);
+    setReferencedThreads([]);
+    setRefInputOpen(false);
+    setRefInputValue("");
+    setResolvingRef(false);
     setDragActive(false);
     setConversationId(null);
     setRawConversation(null);
@@ -268,6 +356,7 @@ export default function ConversationPanel({
     cap: CapturedSelection,
     q: string,
     atts: AttachedImage[],
+    refIds: string[],
   ) {
     setStreaming(true);
     setError(null);
@@ -278,6 +367,7 @@ export default function ConversationPanel({
         role: "user",
         text: q,
         attachments: atts.length > 0 ? atts : undefined,
+        referencedThreadIds: refIds.length > 0 ? refIds : undefined,
         created_at: askedAt,
       },
       { role: "assistant", text: "" },
@@ -299,6 +389,7 @@ export default function ConversationPanel({
           })),
           question: q,
           attachments: atts,
+          referencedThreadIds: refIds,
         }),
       });
       await consumeSseInto(r, {
@@ -330,6 +421,7 @@ export default function ConversationPanel({
     cap: CapturedSelection,
     text: string,
     atts: AttachedImage[],
+    refIds: string[],
   ) {
     setPosting(true);
     setError(null);
@@ -340,6 +432,7 @@ export default function ConversationPanel({
         role: "memo",
         text,
         attachments: atts.length > 0 ? atts : undefined,
+        referencedThreadIds: refIds.length > 0 ? refIds : undefined,
         created_at: now,
       },
     ]);
@@ -360,6 +453,7 @@ export default function ConversationPanel({
           })),
           text,
           attachments: atts,
+          referencedThreadIds: refIds,
         }),
       });
       if (!r.ok) {
@@ -376,7 +470,11 @@ export default function ConversationPanel({
     }
   }
 
-  async function appendMemoToExisting(text: string, atts: AttachedImage[]) {
+  async function appendMemoToExisting(
+    text: string,
+    atts: AttachedImage[],
+    refIds: string[],
+  ) {
     if (!conversationId) return;
     setPosting(true);
     setError(null);
@@ -387,6 +485,7 @@ export default function ConversationPanel({
         role: "memo",
         text,
         attachments: atts.length > 0 ? atts : undefined,
+        referencedThreadIds: refIds.length > 0 ? refIds : undefined,
         created_at: now,
       },
     ]);
@@ -394,7 +493,11 @@ export default function ConversationPanel({
       const r = await fetch(`/api/conversations/${conversationId}/memos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, attachments: atts }),
+        body: JSON.stringify({
+          text,
+          attachments: atts,
+          referencedThreadIds: refIds,
+        }),
       });
       if (!r.ok) {
         setError(`failed to save memo: ${r.status}`);
@@ -408,7 +511,11 @@ export default function ConversationPanel({
     }
   }
 
-  async function sendFollowup(q: string, atts: AttachedImage[]) {
+  async function sendFollowup(
+    q: string,
+    atts: AttachedImage[],
+    refIds: string[],
+  ) {
     if (!conversationId) return;
     setStreaming(true);
     setError(null);
@@ -419,6 +526,7 @@ export default function ConversationPanel({
         role: "user",
         text: q,
         attachments: atts.length > 0 ? atts : undefined,
+        referencedThreadIds: refIds.length > 0 ? refIds : undefined,
         created_at: askedAt,
       },
       { role: "assistant", text: "" },
@@ -429,7 +537,11 @@ export default function ConversationPanel({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: q, attachments: atts }),
+          body: JSON.stringify({
+            question: q,
+            attachments: atts,
+            referencedThreadIds: refIds,
+          }),
         },
       );
       await consumeSseInto(r, {
@@ -544,13 +656,17 @@ export default function ConversationPanel({
     const q = question.trim();
     if (!q || streaming || posting) return;
     const atts = attachments;
+    const refIds = referencedThreads.map((r) => r.conversationId);
     setQuestion("");
     setAttachments([]);
+    setReferencedThreads([]);
+    setRefInputOpen(false);
+    setRefInputValue("");
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversationAsk(active.capture, q, atts);
+      void startNewConversationAsk(active.capture, q, atts, refIds);
     } else if (conversationId) {
-      void sendFollowup(q, atts);
+      void sendFollowup(q, atts, refIds);
     }
   }
 
@@ -558,13 +674,17 @@ export default function ConversationPanel({
     const t = question.trim();
     if (!t || streaming || posting) return;
     const atts = attachments;
+    const refIds = referencedThreads.map((r) => r.conversationId);
     setQuestion("");
     setAttachments([]);
+    setReferencedThreads([]);
+    setRefInputOpen(false);
+    setRefInputValue("");
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversationMemo(active.capture, t, atts);
+      void startNewConversationMemo(active.capture, t, atts, refIds);
     } else if (conversationId) {
-      void appendMemoToExisting(t, atts);
+      void appendMemoToExisting(t, atts, refIds);
     }
   }
 
@@ -838,6 +958,7 @@ export default function ConversationPanel({
                   i === messages.length - 1 &&
                   m.role === "assistant"
                 }
+                onOpenConversation={onOpenConversation}
               />
             ))}
           </div>
@@ -900,7 +1021,18 @@ export default function ConversationPanel({
               if (files.length > 0) {
                 e.preventDefault();
                 void addFiles(files);
+                return;
               }
+              const text = e.clipboardData.getData("text/plain");
+              if (!text) return;
+              const id = parseReferencedThreadFromUrl(text);
+              if (!id) return;
+              const isWholeToken =
+                text.trim() === id ||
+                /^https?:\/\/[^\s]+$/.test(text.trim());
+              if (!isWholeToken) return;
+              e.preventDefault();
+              void addReferencedThreadFromInput(text);
             }}
           />
           {attachments.length > 0 && (
@@ -941,6 +1073,105 @@ export default function ConversationPanel({
               ))}
             </div>
           )}
+          {referencedThreads.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {referencedThreads.map((r, i) => (
+                <div
+                  key={r.conversationId}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                  title={`Referenced thread: ${r.title}${
+                    r.pageLabel ? ` · ${r.pageLabel}` : ""
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="12"
+                    height="12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    className="shrink-0 text-zinc-500"
+                  >
+                    <path d="M6.5 9.5L4.5 11.5a2.121 2.121 0 0 1-3-3L4 6" />
+                    <path d="M9.5 6.5L11.5 4.5a2.121 2.121 0 0 1 3 3L12 10" />
+                    <path d="M6 10l4-4" />
+                  </svg>
+                  <span className="min-w-0 truncate text-zinc-800 dark:text-zinc-200">
+                    {r.title}
+                  </span>
+                  {r.pageLabel && (
+                    <span className="text-zinc-500">· {r.pageLabel}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeReferencedThread(i)}
+                    title="Remove referenced thread"
+                    aria-label={`Remove reference to ${r.title}`}
+                    className="-mr-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="10"
+                      height="10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 4l8 8" />
+                      <path d="M12 4l-8 8" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {refInputOpen && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                value={refInputValue}
+                onChange={(e) => setRefInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submitRefInput();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setRefInputOpen(false);
+                    setRefInputValue("");
+                  }
+                }}
+                placeholder="Paste shared thread URL or id"
+                disabled={resolvingRef}
+                autoFocus
+                className="flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
+              />
+              <button
+                type="button"
+                onClick={() => void submitRefInput()}
+                disabled={resolvingRef || !refInputValue.trim()}
+                className="rounded border border-zinc-300 bg-white px-3 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              >
+                {resolvingRef ? "Adding…" : "Add"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRefInputOpen(false);
+                  setRefInputValue("");
+                }}
+                disabled={resolvingRef}
+                className="rounded px-2 py-1 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           {deferredTrimmed && (
             <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
               <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
@@ -962,32 +1193,73 @@ export default function ConversationPanel({
             }}
           />
           <div className="mt-2 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={busy || attachments.length >= MAX_ATTACHMENTS_PER_TURN}
-              title={
-                attachments.length >= MAX_ATTACHMENTS_PER_TURN
-                  ? `Max ${MAX_ATTACHMENTS_PER_TURN} attachments`
-                  : "Attach images"
-              }
-              aria-label="Attach images"
-              className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy || attachments.length >= MAX_ATTACHMENTS_PER_TURN}
+                title={
+                  attachments.length >= MAX_ATTACHMENTS_PER_TURN
+                    ? `Max ${MAX_ATTACHMENTS_PER_TURN} attachments`
+                    : "Attach images"
+                }
+                aria-label="Attach images"
+                className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100"
               >
-                <path d="M11.5 6.5L6 12a2.5 2.5 0 1 1-3.5-3.5l6-6a4 4 0 0 1 5.5 5.5l-6 6" />
-              </svg>
-            </button>
+                <svg
+                  viewBox="0 0 16 16"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M11.5 6.5L6 12a2.5 2.5 0 1 1-3.5-3.5l6-6a4 4 0 0 1 5.5 5.5l-6 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRefInputOpen((open) => !open);
+                  setError(null);
+                }}
+                disabled={
+                  busy ||
+                  referencedThreads.length >= MAX_REFERENCED_THREADS_PER_TURN
+                }
+                title={
+                  referencedThreads.length >= MAX_REFERENCED_THREADS_PER_TURN
+                    ? `Max ${MAX_REFERENCED_THREADS_PER_TURN} referenced threads`
+                    : "Reference another thread"
+                }
+                aria-label="Reference another thread"
+                aria-pressed={refInputOpen}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100 ${
+                  refInputOpen
+                    ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                    : ""
+                }`}
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6.5 9.5L4.5 11.5a2.121 2.121 0 0 1-3-3L4 6" />
+                  <path d="M9.5 6.5L11.5 4.5a2.121 2.121 0 0 1 3 3L12 10" />
+                  <path d="M6 10l4-4" />
+                </svg>
+              </button>
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1138,12 +1410,55 @@ function AttachmentStrip({ attachments }: { attachments: AttachedImage[] }) {
   );
 }
 
+function ReferencedThreadsLine({
+  ids,
+  onOpen,
+}: {
+  ids: string[];
+  onOpen?: (conversationId: string) => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 print:hidden">
+      <span className="uppercase tracking-wide">References:</span>
+      {ids.map((id) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onOpen?.(id)}
+          disabled={!onOpen}
+          title={`Open referenced thread ${id}`}
+          className="inline-flex max-w-[12rem] items-center gap-1 truncate rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-mono hover:bg-zinc-100 disabled:cursor-default disabled:opacity-70 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="10"
+            height="10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6.5 9.5L4.5 11.5a2.121 2.121 0 0 1-3-3L4 6" />
+            <path d="M9.5 6.5L11.5 4.5a2.121 2.121 0 0 1 3 3L12 10" />
+            <path d="M6 10l4-4" />
+          </svg>
+          <span className="truncate">{id}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MessageBubble({
   m,
   streaming,
+  onOpenConversation,
 }: {
   m: DisplayMessage;
   streaming: boolean;
+  onOpenConversation?: (conversationId: string) => void;
 }) {
   if (m.role === "memo") {
     return (
@@ -1157,6 +1472,12 @@ function MessageBubble({
         <MathMarkdown text={m.text} />
         {m.attachments && (
           <AttachmentStrip attachments={m.attachments} />
+        )}
+        {m.referencedThreadIds && m.referencedThreadIds.length > 0 && (
+          <ReferencedThreadsLine
+            ids={m.referencedThreadIds}
+            onOpen={onOpenConversation}
+          />
         )}
       </div>
     );
@@ -1184,6 +1505,12 @@ function MessageBubble({
         <>
           <MathMarkdown text={m.text} />
           {m.attachments && <AttachmentStrip attachments={m.attachments} />}
+          {m.referencedThreadIds && m.referencedThreadIds.length > 0 && (
+            <ReferencedThreadsLine
+              ids={m.referencedThreadIds}
+              onOpen={onOpenConversation}
+            />
+          )}
         </>
       ) : (
         <>
@@ -1207,6 +1534,7 @@ function turnsToDisplay(
         role: "memo",
         text: t.text,
         attachments: t.attachments,
+        referencedThreadIds: t.referenced_thread_ids,
         created_at: t.created_at,
       };
     }
@@ -1224,6 +1552,7 @@ function turnsToDisplay(
         role: "user",
         text,
         attachments: t.attachments,
+        referencedThreadIds: t.referenced_thread_ids,
         created_at: t.created_at ?? fallbackCreatedAt,
       };
     }

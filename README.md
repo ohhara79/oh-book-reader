@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# oh-book-reader
 
-## Getting Started
+A single-user PDF reader with Claude-powered Q&A on selected regions. Open a PDF, draw a box around any text/figure/equation across one or more pages, and ask Claude follow-up questions about that excerpt. Everything lives on the local filesystem under `./data/` — no database.
 
-First, run the development server:
+## Prerequisites
+
+- **Node.js 20+** (developed on v22).
+- **npm**.
+- **Anthropic Claude Code CLI**, logged into a Claude Max or Pro subscription. The app authenticates by reusing the OAuth session in `~/.claude/`; there is no in-app API-key flow.
+  ```bash
+  npm install -g @anthropic-ai/claude-code
+  claude login
+  ```
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <this-repo> oh-book-reader
+cd oh-book-reader
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm install` runs a `postinstall` step that copies the PDF.js worker to `public/pdf.worker.min.mjs`. **Do not pass `--ignore-scripts`** — without that file, in-browser PDF rendering breaks.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Optional: `.env.local`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+You only need this if `npm run dev` later fails with `Claude Code native binary not found`. In that case, create `.env.local` pointing at your `claude` executable:
 
-## Learn More
+```bash
+# .env.local
+CLAUDE_CODE_PATH=/absolute/path/to/claude
+```
 
-To learn more about Next.js, take a look at the following resources:
+Find the path with `which claude`. For an nvm-managed install it usually looks like `~/.nvm/versions/node/<version>/lib/node_modules/@anthropic-ai/claude-code/bin/claude`. See `lib/claude.ts` for how this is consumed.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Run
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev          # http://localhost:3000
+npm run build && npm start   # production build
+```
 
-## Deploy on Vercel
+## Verify Claude is wired up
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx tsx scripts/smoke-claude.ts
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+It should stream `pong` and finish with `[OK] sessionId: …`. If it fails, `claude login` is missing or expired, or the executable can't be located — set `CLAUDE_CODE_PATH` (see above).
+
+## Data & storage
+
+All state — uploaded PDFs, page selections, rendered region images, and conversations — lives under `./data/books/<book_id>/`:
+
+```
+data/books/<book_id>/
+  meta.json              # title, page count, upload time
+  book.pdf               # the original PDF
+  selections/<sel_id>.json + <sel_id>_<page>.png
+  conversations/<conv_id>.json
+```
+
+The directory is created on first upload. To wipe all state, delete `./data/`.
+
+## A note on Next.js
+
+This project runs on Next.js 16, whose conventions differ from earlier versions. If you're modifying app code, consult `node_modules/next/dist/docs/` (and see `CLAUDE.md`) before relying on memory of older Next.js APIs.

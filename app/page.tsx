@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatTimestamp } from "@/lib/formatTimestamp";
+import { triggerBlobDownload } from "@/lib/exportConversation.client";
 
 type Book = {
   id: string;
@@ -18,6 +19,7 @@ export default function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -49,6 +51,31 @@ export default function Library() {
       await refresh();
     } finally {
       setDeleting((prev) => {
+        const next = new Set(prev);
+        next.delete(book.id);
+        return next;
+      });
+    }
+  }
+
+  async function onDownload(book: Book) {
+    setDownloading((prev) => new Set(prev).add(book.id));
+    try {
+      const r = await fetch(`/api/books/${book.id}/export`);
+      if (!r.ok) {
+        alert(`download failed: ${r.status} ${await r.text()}`);
+        return;
+      }
+      const disposition = r.headers.get("Content-Disposition") ?? "";
+      const match = /filename="([^"]+)"/.exec(disposition);
+      const slug = book.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      const filename = match?.[1] ?? `${slug || "book"}_${book.id}_threads.zip`;
+      triggerBlobDownload(await r.blob(), filename);
+    } finally {
+      setDownloading((prev) => {
         const next = new Set(prev);
         next.delete(book.id);
         return next;
@@ -100,6 +127,7 @@ export default function Library() {
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {books.map((b) => {
             const isDeleting = deleting.has(b.id);
+            const isDownloading = downloading.has(b.id);
             return (
               <li
                 key={b.id}
@@ -115,6 +143,50 @@ export default function Library() {
                   <span className="shrink-0 text-xs text-zinc-500">
                     {b.page_count} pages · {formatTimestamp(b.uploaded_at)}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => onDownload(b)}
+                    disabled={isDownloading}
+                    title={
+                      isDownloading ? "Downloading…" : "Download all threads"
+                    }
+                    aria-label={
+                      isDownloading ? "Downloading…" : "Download all threads"
+                    }
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-zinc-600 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  >
+                    {isDownloading ? (
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        className="animate-spin"
+                        aria-hidden="true"
+                      >
+                        <path d="M14 8a6 6 0 1 1-6-6" />
+                      </svg>
+                    ) : (
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M8 2v8" />
+                        <path d="M4.5 7.5L8 11l3.5-3.5" />
+                        <path d="M3 13h10" />
+                      </svg>
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => onDelete(b)}

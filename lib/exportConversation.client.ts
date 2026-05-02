@@ -8,8 +8,7 @@ export async function copyConversationMarkdown(md: string): Promise<boolean> {
   }
 }
 
-export function downloadConversationMarkdown(md: string, filename: string): void {
-  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+export function triggerBlobDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -19,6 +18,13 @@ export function downloadConversationMarkdown(md: string, filename: string): void
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function downloadConversationMarkdown(md: string, filename: string): void {
+  triggerBlobDownload(
+    new Blob([md], { type: "text/markdown;charset=utf-8" }),
+    filename,
+  );
 }
 
 export function conversationFilename(args: {

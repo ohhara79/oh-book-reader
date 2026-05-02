@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 
 export type ThreadListSelection = {
@@ -31,6 +31,22 @@ type Row = {
 
 type SortMode = "date" | "page";
 
+const THREAD_LIST_KEY = "ohbr.threadList";
+
+type StoredThreadListState = { filter?: "page" | "all"; sort?: SortMode };
+
+function readThreadListState(): StoredThreadListState | null {
+  try {
+    const raw = localStorage.getItem(THREAD_LIST_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as StoredThreadListState;
+  } catch {
+    return null;
+  }
+}
+
 export default function ThreadList({
   selections,
   convsBySelection,
@@ -39,6 +55,25 @@ export default function ThreadList({
 }: Props) {
   const [filter, setFilter] = useState<"page" | "all">("page");
   const [sort, setSort] = useState<SortMode>("date");
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const stored = readThreadListState();
+    if (stored) {
+      if (stored.filter === "page" || stored.filter === "all") {
+        setFilter(stored.filter);
+      }
+      if (stored.sort === "date" || stored.sort === "page") {
+        setSort(stored.sort);
+      }
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(THREAD_LIST_KEY, JSON.stringify({ filter, sort }));
+  }, [filter, sort, hydrated]);
 
   const allRows = useMemo<Row[]>(() => {
     type SelInfo = { pages: number[]; sortTop: number; sortLeft: number };

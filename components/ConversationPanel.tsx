@@ -1031,8 +1031,7 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
       <div className="space-y-2">
         {capture.spans.map((s, i) => (
           <div key={i}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <ZoomableImage
               src={`data:${s.imageMediaType};base64,${s.imageBase64}`}
               alt={`selection page ${s.page}`}
               className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700"
@@ -1054,13 +1053,81 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
   );
 }
 
+function ZoomableImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`Open ${alt} at original size`}
+        className="cursor-zoom-in border-0 bg-transparent p-0"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} className={className} />
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 overflow-auto bg-black/80 backdrop-blur-sm print:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close preview"
+            className="fixed right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-lg leading-none text-zinc-900 shadow hover:bg-white"
+          >
+            ×
+          </button>
+          <div className="flex min-h-full min-w-full items-center justify-center p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={alt}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function AttachmentStrip({ attachments }: { attachments: AttachedImage[] }) {
   if (attachments.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-2">
       {attachments.map((a, i) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ZoomableImage
           key={i}
           src={`data:${a.media_type};base64,${a.data}`}
           alt={`attachment ${i + 1}`}

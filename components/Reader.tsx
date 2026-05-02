@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -81,6 +82,7 @@ function readBookState(id: string): StoredBookState | null {
 }
 
 export default function Reader({ bookId }: { bookId: string }) {
+  const searchParams = useSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [pageNum, setPageNum] = useState(DEFAULT_PAGE);
   const [scale, setScale] = useState(DEFAULT_SCALE);
@@ -146,6 +148,16 @@ export default function Reader({ bookId }: { bookId: string }) {
         );
       }
     }
+
+    const sharedPage = Number(searchParams?.get("page"));
+    if (Number.isFinite(sharedPage) && sharedPage >= 1) {
+      setPageNum(Math.floor(sharedPage));
+    }
+    const sharedConv = searchParams?.get("c");
+    if (sharedConv) {
+      setActive({ kind: "existing", conversationId: sharedConv });
+    }
+
     setHydrated(true);
   }, [bookId]);
 
@@ -682,6 +694,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 : "empty"
             }
             bookId={bookId}
+            pageNum={pageNum}
             active={active}
             onCreated={onConversationCreated}
             onClose={() => setActive(null)}

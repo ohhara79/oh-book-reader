@@ -34,6 +34,7 @@ type ActiveConversation =
 
 type Props = {
   bookId: string;
+  pageNum: number;
   active: ActiveConversation | null;
   onCreated: () => void;
   onClose: () => void;
@@ -53,6 +54,7 @@ type DisplayMessage =
 
 export default function ConversationPanel({
   bookId,
+  pageNum,
   active,
   onCreated,
   onClose,
@@ -68,6 +70,7 @@ export default function ConversationPanel({
   const [streaming, setStreaming] = useState(false);
   const [posting, setPosting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const newConvSentRef = useRef(false);
@@ -82,6 +85,7 @@ export default function ConversationPanel({
     setExistingCapture(null);
     setDeleting(false);
     setPosting(false);
+    setCopied(false);
     newConvSentRef.current = false;
 
     if (!active) return;
@@ -129,6 +133,21 @@ export default function ConversationPanel({
       conversationId: rawConversation.id,
     });
     downloadConversationMarkdown(exportMarkdown, filename);
+  }
+
+  async function onShareThread() {
+    if (!conversationId) return;
+    const params = new URLSearchParams();
+    params.set("page", String(pageNum));
+    params.set("c", conversationId);
+    const url = `${window.location.origin}/books/${bookId}?${params.toString()}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("Copy share link:", url);
+    }
   }
 
   async function startNewConversationAsk(cap: CapturedSelection, q: string) {
@@ -395,6 +414,48 @@ export default function ConversationPanel({
                     <path d="M5 7l3 3 3-3" />
                     <path d="M3 13h10" />
                   </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={onShareThread}
+                  disabled={busy || deleting}
+                  title={copied ? "Copied!" : "Copy share link"}
+                  aria-label={copied ? "Share link copied" : "Copy share link"}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
+                >
+                  {copied ? (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 8.5l3 3 7-7" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="4" cy="8" r="1.75" />
+                      <circle cx="12" cy="3.5" r="1.75" />
+                      <circle cx="12" cy="12.5" r="1.75" />
+                      <path d="M5.5 7.2l5-2.6" />
+                      <path d="M5.5 8.8l5 2.6" />
+                    </svg>
+                  )}
                 </button>
                 <button
                   type="button"

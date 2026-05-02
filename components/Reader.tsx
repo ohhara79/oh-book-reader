@@ -428,6 +428,78 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
   };
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const stepZoom = (delta: number) => {
+        const cur = scaleRef.current;
+        const next = Math.max(SCALE_MIN, Math.min(SCALE_MAX, cur + delta));
+        if ((cur < 1 && next > 1) || (cur > 1 && next < 1)) {
+          handleScaleChange(1);
+        } else {
+          handleScaleChange(next);
+        }
+      };
+
+      switch (e.key) {
+        case "ArrowLeft":
+        case "PageUp":
+          e.preventDefault();
+          goPrev();
+          return;
+        case "ArrowRight":
+        case "PageDown":
+        case " ":
+          e.preventDefault();
+          goNext();
+          return;
+        case "Home":
+          if (numPages) {
+            e.preventDefault();
+            setPageNum(1);
+            scrollToPage(1);
+          }
+          return;
+        case "End":
+          if (numPages) {
+            e.preventDefault();
+            setPageNum(numPages);
+            scrollToPage(numPages);
+          }
+          return;
+        case "+":
+        case "=":
+          e.preventDefault();
+          stepZoom(0.2);
+          return;
+        case "-":
+          e.preventDefault();
+          stepZoom(-0.2);
+          return;
+        case "0":
+          e.preventDefault();
+          handleScaleChange(1);
+          return;
+        case "\\":
+          e.preventDefault();
+          setSidebarHidden((h) => !h);
+          return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goPrev, goNext, scrollToPage, numPages, handleScaleChange]);
+
   const onCapture = useCallback((cap: CapturedSelection) => {
     setActive({ kind: "new", capture: cap });
   }, []);

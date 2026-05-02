@@ -393,6 +393,39 @@ export default function ConversationPanel({
     return () => cancelAnimationFrame(handle);
   }, [active]);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const deleteConversationRef = useRef<() => Promise<void>>(() =>
+    Promise.resolve(),
+  );
+  deleteConversationRef.current = deleteConversation;
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key === "Delete") {
+        e.preventDefault();
+        void deleteConversationRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
+
   const listScrollRestoredRef = useRef(false);
   useLayoutEffect(() => {
     if (active || listScrollRestoredRef.current) return;
@@ -1157,6 +1190,11 @@ export default function ConversationPanel({
             placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images and text files."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                submitMemo();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submitAsk();

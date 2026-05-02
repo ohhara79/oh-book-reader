@@ -339,24 +339,28 @@ export default function ConversationPanel({
 
     if (active.kind === "existing") {
       void (async () => {
-        const r = await fetch(`/api/conversations/${active.conversationId}`);
-        if (!r.ok) {
-          setError(`failed to load: ${r.status}`);
-          return;
-        }
-        const j = (await r.json()) as {
-          conversation: Conversation;
-          capture: CapturedSelection | null;
-        };
-        setConversationId(j.conversation.id);
-        setRawConversation(j.conversation);
-        setMessages(
-          turnsToDisplay(j.conversation.messages, j.conversation.created_at),
-        );
-        if (j.capture) setExistingCapture(j.capture);
+        const conv = await loadConversation(active.conversationId);
+        if (!conv) return;
+        setConversationId(conv.id);
+        setMessages(turnsToDisplay(conv.messages, conv.created_at));
       })();
     }
   }, [active]);
+
+  async function loadConversation(cid: string): Promise<Conversation | null> {
+    const r = await fetch(`/api/conversations/${cid}`);
+    if (!r.ok) {
+      setError(`failed to load: ${r.status}`);
+      return null;
+    }
+    const j = (await r.json()) as {
+      conversation: Conversation;
+      capture: CapturedSelection | null;
+    };
+    setRawConversation(j.conversation);
+    if (j.capture) setExistingCapture(j.capture);
+    return j.conversation;
+  }
 
   useEffect(() => {
     if (!active) return;
@@ -429,6 +433,7 @@ export default function ConversationPanel({
       },
       { role: "assistant", text: "" },
     ]);
+    let createdId: string | null = null;
     try {
       const r = await fetch("/api/conversations", {
         method: "POST",
@@ -450,7 +455,10 @@ export default function ConversationPanel({
         }),
       });
       await consumeSseInto(r, {
-        onMeta: (cid) => setConversationId(cid),
+        onMeta: (cid) => {
+          createdId = cid;
+          setConversationId(cid);
+        },
         onDelta: (chunk) =>
           setMessages((prev) => {
             const next = [...prev];
@@ -466,6 +474,7 @@ export default function ConversationPanel({
           }),
         onError: (m) => setError(m),
       });
+      if (createdId) await loadConversation(createdId);
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -520,6 +529,7 @@ export default function ConversationPanel({
       }
       const j = (await r.json()) as { conversationId: string };
       setConversationId(j.conversationId);
+      await loadConversation(j.conversationId);
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -778,7 +788,7 @@ export default function ConversationPanel({
             showThreadListControls ? "min-w-0 shrink-0" : "min-w-0 flex-1"
           }
         >
-          {active?.kind === "existing" && rawConversation ? (
+          {rawConversation ? (
             editingTitle ? (
               <input
                 ref={titleInputRef}
@@ -860,7 +870,7 @@ export default function ConversationPanel({
         )}
         {active && (
           <div className="ml-auto flex items-center gap-1">
-            {active.kind === "existing" && conversationId && (
+            {conversationId && rawConversation && (
               <>
                 <button
                   type="button"

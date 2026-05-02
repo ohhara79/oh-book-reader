@@ -30,8 +30,10 @@ import {
   downloadConversationMarkdown,
 } from "@/lib/exportConversation.client";
 import ThreadList, {
+  ThreadListControls,
   type ThreadListConv,
   type ThreadListSelection,
+  useThreadListRows,
 } from "./ThreadList";
 
 const ATTACHMENT_ACCEPT = [
@@ -733,11 +735,21 @@ export default function ConversationPanel({
     for (const cs of Object.values(convsBySelection)) n += cs.length;
     return n;
   }, [convsBySelection]);
+  const threadListState = useThreadListRows({
+    selections,
+    convsBySelection,
+    currentPage: pageNum,
+  });
+  const showThreadListControls = !active && totalThreadCount > 0;
 
   return (
     <div className="flex h-full flex-col print:h-auto">
-      <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-4 py-2 text-sm print:hidden dark:border-zinc-800">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-zinc-200 px-4 py-2 text-sm print:hidden dark:border-zinc-800">
+        <div
+          className={
+            showThreadListControls ? "min-w-0 shrink-0" : "min-w-0 flex-1"
+          }
+        >
           {active?.kind === "existing" && rawConversation ? (
             editingTitle ? (
               <input
@@ -807,8 +819,19 @@ export default function ConversationPanel({
             </span>
           )}
         </div>
+        {showThreadListControls && (
+          <div className="ml-auto">
+            <ThreadListControls
+              filter={threadListState.filter}
+              setFilter={threadListState.setFilter}
+              sort={threadListState.sort}
+              setSort={threadListState.setSort}
+              count={threadListState.visibleRows.length}
+            />
+          </div>
+        )}
         {active && (
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1">
             {active.kind === "existing" && conversationId && (
               <>
                 <button
@@ -962,8 +985,8 @@ export default function ConversationPanel({
           ) : (
             <div className="space-y-3">
               <ThreadList
-                selections={selections}
-                convsBySelection={convsBySelection}
+                visibleRows={threadListState.visibleRows}
+                filter={threadListState.filter}
                 currentPage={pageNum}
                 onOpen={onOpenConversation}
                 onHover={onThreadHover}

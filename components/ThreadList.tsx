@@ -16,14 +16,6 @@ export type ThreadListConv = {
   memoCount: number;
 };
 
-type Props = {
-  selections: ThreadListSelection[];
-  convsBySelection: Record<string, ThreadListConv[]>;
-  currentPage: number;
-  onOpen: (conversationId: string) => void;
-  onHover?: (selectionId: string | null, pages: number[]) => void;
-};
-
 type Row = {
   conv: ThreadListConv;
   selectionId: string;
@@ -32,11 +24,12 @@ type Row = {
   sortLeft: number;
 };
 
+type FilterMode = "page" | "all";
 type SortMode = "date" | "page";
 
 const THREAD_LIST_KEY = "ohbr.threadList";
 
-type StoredThreadListState = { filter?: "page" | "all"; sort?: SortMode };
+type StoredThreadListState = { filter?: FilterMode; sort?: SortMode };
 
 function readThreadListState(): StoredThreadListState | null {
   try {
@@ -50,14 +43,26 @@ function readThreadListState(): StoredThreadListState | null {
   }
 }
 
-export default function ThreadList({
+export type UseThreadListRowsArgs = {
+  selections: ThreadListSelection[];
+  convsBySelection: Record<string, ThreadListConv[]>;
+  currentPage: number;
+};
+
+export type UseThreadListRowsResult = {
+  filter: FilterMode;
+  setFilter: (f: FilterMode) => void;
+  sort: SortMode;
+  setSort: (s: SortMode) => void;
+  visibleRows: Row[];
+};
+
+export function useThreadListRows({
   selections,
   convsBySelection,
   currentPage,
-  onOpen,
-  onHover,
-}: Props) {
-  const [filter, setFilter] = useState<"page" | "all">("page");
+}: UseThreadListRowsArgs): UseThreadListRowsResult {
+  const [filter, setFilter] = useState<FilterMode>("page");
   const [sort, setSort] = useState<SortMode>("date");
   const [hydrated, setHydrated] = useState(false);
 
@@ -148,79 +153,105 @@ export default function ThreadList({
     return sortedRows.filter((r) => r.pages.includes(currentPage));
   }, [sortedRows, filter, currentPage]);
 
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-        <div className="flex flex-wrap gap-x-2 gap-y-1.5">
-          <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
-            <FilterButton
-              active={filter === "page"}
-              onClick={() => setFilter("page")}
-            >
-              This page
-            </FilterButton>
-            <FilterButton
-              active={filter === "all"}
-              onClick={() => setFilter("all")}
-            >
-              All pages
-            </FilterButton>
-          </div>
-          <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
-            <FilterButton
-              active={sort === "date"}
-              onClick={() => setSort("date")}
-            >
-              Date
-            </FilterButton>
-            <FilterButton
-              active={sort === "page"}
-              onClick={() => setSort("page")}
-            >
-              Page
-            </FilterButton>
-          </div>
-        </div>
-        <span className="text-xs text-zinc-500">
-          {visibleRows.length}{" "}
-          {visibleRows.length === 1 ? "thread" : "threads"}
-        </span>
-      </div>
+  return { filter, setFilter, sort, setSort, visibleRows };
+}
 
-      {visibleRows.length === 0 ? (
-        <div className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700">
-          {filter === "page" ? (
-            <p>No threads on page {currentPage}.</p>
-          ) : (
-            <p>No threads yet.</p>
-          )}
-        </div>
-      ) : (
-        <ul className="space-y-1.5">
-          {visibleRows.map((r) => (
-            <li key={r.conv.id}>
-              <button
-                type="button"
-                onClick={() => onOpen(r.conv.id)}
-                onMouseEnter={() => onHover?.(r.selectionId, r.pages)}
-                onMouseLeave={() => onHover?.(null, [])}
-                onFocus={() => onHover?.(r.selectionId, r.pages)}
-                onBlur={() => onHover?.(null, [])}
-                className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"
-              >
-                <ThreadHeadingRow
-                  title={r.conv.title}
-                  pages={r.pages}
-                  updatedAt={r.conv.updated_at}
-                  askCount={r.conv.askCount}
-                  memoCount={r.conv.memoCount}
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+type ThreadListControlsProps = {
+  filter: FilterMode;
+  setFilter: (f: FilterMode) => void;
+  sort: SortMode;
+  setSort: (s: SortMode) => void;
+  count: number;
+};
+
+export function ThreadListControls({
+  filter,
+  setFilter,
+  sort,
+  setSort,
+  count,
+}: ThreadListControlsProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
+        <FilterButton
+          active={filter === "page"}
+          onClick={() => setFilter("page")}
+        >
+          This page
+        </FilterButton>
+        <FilterButton
+          active={filter === "all"}
+          onClick={() => setFilter("all")}
+        >
+          All pages
+        </FilterButton>
+      </div>
+      <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
+        <FilterButton active={sort === "date"} onClick={() => setSort("date")}>
+          Date
+        </FilterButton>
+        <FilterButton active={sort === "page"} onClick={() => setSort("page")}>
+          Page
+        </FilterButton>
+      </div>
+      <span className="text-xs text-zinc-500">
+        {count} {count === 1 ? "thread" : "threads"}
+      </span>
     </div>
+  );
+}
+
+type Props = {
+  visibleRows: Row[];
+  filter: FilterMode;
+  currentPage: number;
+  onOpen: (conversationId: string) => void;
+  onHover?: (selectionId: string | null, pages: number[]) => void;
+};
+
+export default function ThreadList({
+  visibleRows,
+  filter,
+  currentPage,
+  onOpen,
+  onHover,
+}: Props) {
+  if (visibleRows.length === 0) {
+    return (
+      <div className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700">
+        {filter === "page" ? (
+          <p>No threads on page {currentPage}.</p>
+        ) : (
+          <p>No threads yet.</p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-1.5">
+      {visibleRows.map((r) => (
+        <li key={r.conv.id}>
+          <button
+            type="button"
+            onClick={() => onOpen(r.conv.id)}
+            onMouseEnter={() => onHover?.(r.selectionId, r.pages)}
+            onMouseLeave={() => onHover?.(null, [])}
+            onFocus={() => onHover?.(r.selectionId, r.pages)}
+            onBlur={() => onHover?.(null, [])}
+            className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"
+          >
+            <ThreadHeadingRow
+              title={r.conv.title}
+              pages={r.pages}
+              updatedAt={r.conv.updated_at}
+              askCount={r.conv.askCount}
+              memoCount={r.conv.memoCount}
+            />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -247,4 +278,3 @@ function FilterButton({
     </button>
   );
 }
-

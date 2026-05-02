@@ -411,6 +411,7 @@ export default function SelectionOverlay({
         const items = textLayer.querySelectorAll<HTMLElement>(
           "span, div.react-pdf__Page__textContent__container > *",
         );
+        const range = document.createRange();
         items.forEach((el) => {
           const text = (el.textContent ?? "").trim();
           if (!text) return;
@@ -420,12 +421,36 @@ export default function SelectionOverlay({
           const right = left + r.width;
           const bottom = top + r.height;
           allText.push(text);
-          const intersects =
+          const lineIntersects =
             right >= localLeft &&
             left <= localRight &&
             bottom >= localTop &&
             top <= localBottom;
-          if (intersects) inside.push(text);
+          if (!lineIntersects) return;
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          let node: Node | null = walker.nextNode();
+          while (node) {
+            const value = node.nodeValue ?? "";
+            for (const m of value.matchAll(/\S+/g)) {
+              const start = m.index ?? 0;
+              range.setStart(node, start);
+              range.setEnd(node, start + m[0].length);
+              const wr = range.getBoundingClientRect();
+              const wLeft = wr.left - layerRect.left;
+              const wTop = wr.top - layerRect.top;
+              const wRight = wLeft + wr.width;
+              const wBottom = wTop + wr.height;
+              if (
+                wRight >= localLeft &&
+                wLeft <= localRight &&
+                wBottom >= localTop &&
+                wTop <= localBottom
+              ) {
+                inside.push(m[0]);
+              }
+            }
+            node = walker.nextNode();
+          }
         });
       }
 

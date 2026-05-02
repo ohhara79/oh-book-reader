@@ -205,6 +205,7 @@ export default function ConversationPanel({
   const [titleDraft, setTitleDraft] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
@@ -328,6 +329,7 @@ export default function ConversationPanel({
     newConvSentRef.current = false;
     titleComposingRef.current = false;
     savingTitleRef.current = false;
+    stickToBottomRef.current = true;
     if (titleBlurTimeoutRef.current) {
       clearTimeout(titleBlurTimeoutRef.current);
       titleBlurTimeoutRef.current = null;
@@ -358,6 +360,7 @@ export default function ConversationPanel({
 
   useEffect(() => {
     if (!active) return;
+    if (!stickToBottomRef.current) return;
     scrollerRef.current?.scrollTo({
       top: scrollerRef.current.scrollHeight,
       behavior: "smooth",
@@ -411,6 +414,7 @@ export default function ConversationPanel({
     atts: Attachment[],
     refIds: string[],
   ) {
+    stickToBottomRef.current = true;
     setStreaming(true);
     setError(null);
     const askedAt = Date.now();
@@ -476,6 +480,7 @@ export default function ConversationPanel({
     atts: Attachment[],
     refIds: string[],
   ) {
+    stickToBottomRef.current = true;
     setPosting(true);
     setError(null);
     const now = Date.now();
@@ -529,6 +534,7 @@ export default function ConversationPanel({
     refIds: string[],
   ) {
     if (!conversationId) return;
+    stickToBottomRef.current = true;
     setPosting(true);
     setError(null);
     const now = Date.now();
@@ -570,6 +576,7 @@ export default function ConversationPanel({
     refIds: string[],
   ) {
     if (!conversationId) return;
+    stickToBottomRef.current = true;
     setStreaming(true);
     setError(null);
     const askedAt = Date.now();
@@ -994,7 +1001,16 @@ export default function ConversationPanel({
         </h1>
       )}
 
-      <div ref={scrollerRef} className="flex-1 overflow-auto px-4 py-3 print:overflow-visible">
+      <div
+        ref={scrollerRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const distanceFromBottom =
+            el.scrollHeight - el.scrollTop - el.clientHeight;
+          stickToBottomRef.current = distanceFromBottom <= 32;
+        }}
+        className="flex-1 overflow-auto px-4 py-3 print:overflow-visible"
+      >
         {isEmpty ? (
           totalThreadCount === 0 ? (
             <p className="text-sm text-zinc-500">

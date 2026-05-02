@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -7,7 +8,7 @@ import rehypeKatex from "rehype-katex";
 const remarkPlugins = [remarkMath];
 const rehypePlugins = [rehypeKatex];
 
-export default function MathMarkdown({ text }: { text: string }) {
+function MathMarkdown({ text }: { text: string }) {
   return (
     <div className="prose prose-sm max-w-none dark:prose-invert">
       <ReactMarkdown
@@ -19,3 +20,5 @@ export default function MathMarkdown({ text }: { text: string }) {
     </div>
   );
 }
+
+export default memo(MathMarkdown);

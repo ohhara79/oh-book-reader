@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
@@ -460,6 +460,8 @@ export default function ConversationPanel({
   const isEmpty = !active;
   const busy = streaming || posting;
   const trimmed = question.trim();
+  const deferredQuestion = useDeferredValue(question);
+  const deferredTrimmed = deferredQuestion.trim();
   const totalThreadCount = useMemo(() => {
     let n = 0;
     for (const cs of Object.values(convsBySelection)) n += cs.length;
@@ -749,12 +751,12 @@ export default function ConversationPanel({
               }
             }}
           />
-          {trimmed && (
+          {deferredTrimmed && (
             <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
               <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
                 Preview
               </p>
-              <MathMarkdown text={question} />
+              <MathMarkdown text={deferredQuestion} />
             </div>
           )}
           <div className="mt-2 flex justify-end gap-2">

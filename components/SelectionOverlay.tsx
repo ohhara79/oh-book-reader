@@ -42,6 +42,7 @@ type Props = {
   convSummaryBySelection: Record<string, ConvSummary>;
   onCapture: (cap: CapturedSelection) => void;
   onPinClick: (selectionId: string) => void;
+  highlightedSelectionId?: string | null;
 };
 
 type StackPicker = {
@@ -72,6 +73,7 @@ export default function SelectionOverlay({
   convSummaryBySelection,
   onCapture,
   onPinClick,
+  highlightedSelectionId = null,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -529,7 +531,11 @@ export default function SelectionOverlay({
           type="button"
           data-pin-selection-id={p.selectionId}
           aria-label={`Open conversation for selection ${p.selectionId}`}
-          className="absolute cursor-pointer border-2 border-amber-500 bg-amber-500/10 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40"
+          className={`absolute cursor-pointer border-2 border-amber-500 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40 ${
+            p.selectionId === highlightedSelectionId
+              ? "bg-amber-500/25"
+              : "bg-amber-500/10"
+          }`}
           style={{
             left: p.left,
             top: p.top,

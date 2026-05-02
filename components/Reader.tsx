@@ -104,6 +104,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [restoreSignal, setRestoreSignal] = useState(0);
+  const [hoveredSelectionId, setHoveredSelectionId] = useState<string | null>(
+    null,
+  );
   const mainRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -111,6 +114,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   const scaleRef = useRef(scale);
   const ioRafRef = useRef<number | null>(null);
   const restoreScrollDoneRef = useRef(false);
+  const hoverScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     pageNumRef.current = pageNum;
@@ -424,6 +430,34 @@ export default function Reader({ bookId }: { bookId: string }) {
     [convsBySelection],
   );
 
+  const handleThreadHover = useCallback(
+    (selectionId: string | null, pages: number[]) => {
+      setHoveredSelectionId(selectionId);
+      if (hoverScrollTimerRef.current) {
+        clearTimeout(hoverScrollTimerRef.current);
+        hoverScrollTimerRef.current = null;
+      }
+      if (!selectionId || pages.length === 0) return;
+      if (pages.includes(pageNumRef.current)) return;
+      const target = pages[0];
+      hoverScrollTimerRef.current = setTimeout(() => {
+        hoverScrollTimerRef.current = null;
+        scrollToPage(target);
+      }, 150);
+    },
+    [scrollToPage],
+  );
+
+  useEffect(
+    () => () => {
+      if (hoverScrollTimerRef.current) {
+        clearTimeout(hoverScrollTimerRef.current);
+        hoverScrollTimerRef.current = null;
+      }
+    },
+    [],
+  );
+
   // Enrich selections with a single text snippet per selection so the
   // overlap-disambiguation popover can identify each one. Joining all spans
   // gives a coherent preview when a selection wraps multiple paragraphs.
@@ -718,6 +752,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   convSummaryBySelection={convSummaryBySelection}
                   onCapture={onCapture}
                   onPinClick={onPinClick}
+                  highlightedSelectionId={hoveredSelectionId}
                 />
               )}
             </div>
@@ -743,6 +778,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             }
             onCreated={onConversationCreated}
             onClose={() => setActive(null)}
+            onThreadHover={handleThreadHover}
           />
         </aside>
       </div>

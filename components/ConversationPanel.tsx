@@ -45,6 +45,7 @@ type Props = {
   onOpenConversation: (conversationId: string) => void;
   onCreated: () => void;
   onClose: () => void;
+  onThreadHover?: (selectionId: string | null, pages: number[]) => void;
 };
 
 type DisplayMessage =
@@ -68,6 +69,7 @@ export default function ConversationPanel({
   onOpenConversation,
   onCreated,
   onClose,
+  onThreadHover,
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -700,6 +702,7 @@ export default function ConversationPanel({
                 convsBySelection={convsBySelection}
                 currentPage={pageNum}
                 onOpen={onOpenConversation}
+                onHover={onThreadHover}
               />
               <p className="px-1 text-xs text-zinc-500">
                 Drag a rectangle on the page to start a new thread.

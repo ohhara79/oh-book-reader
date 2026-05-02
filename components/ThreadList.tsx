@@ -19,6 +19,7 @@ type Props = {
   convsBySelection: Record<string, ThreadListConv[]>;
   currentPage: number;
   onOpen: (conversationId: string) => void;
+  onHover?: (selectionId: string | null, pages: number[]) => void;
 };
 
 type Row = {
@@ -52,6 +53,7 @@ export default function ThreadList({
   convsBySelection,
   currentPage,
   onOpen,
+  onHover,
 }: Props) {
   const [filter, setFilter] = useState<"page" | "all">("page");
   const [sort, setSort] = useState<SortMode>("date");
@@ -209,6 +211,10 @@ export default function ThreadList({
               <button
                 type="button"
                 onClick={() => onOpen(r.conv.id)}
+                onMouseEnter={() => onHover?.(r.selectionId, r.pages)}
+                onMouseLeave={() => onHover?.(null, [])}
+                onFocus={() => onHover?.(r.selectionId, r.pages)}
+                onBlur={() => onHover?.(null, [])}
                 className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"
               >
                 <div className="flex items-baseline justify-between gap-2">

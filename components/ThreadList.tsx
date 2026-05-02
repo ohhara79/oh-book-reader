@@ -5,7 +5,7 @@ import { formatTimestamp } from "@/lib/formatTimestamp";
 
 export type ThreadListSelection = {
   id: string;
-  spans: { page: number }[];
+  spans: { page: number; bbox: [number, number, number, number] }[];
 };
 
 export type ThreadListConv = {
@@ -25,7 +25,11 @@ type Row = {
   conv: ThreadListConv;
   selectionId: string;
   pages: number[];
+  sortTop: number;
+  sortLeft: number;
 };
+
+type SortMode = "date" | "page";
 
 export default function ThreadList({
   selections,
@@ -34,52 +38,109 @@ export default function ThreadList({
   onOpen,
 }: Props) {
   const [filter, setFilter] = useState<"page" | "all">("page");
+  const [sort, setSort] = useState<SortMode>("date");
 
   const allRows = useMemo<Row[]>(() => {
-    const pagesBySelection = new Map<string, number[]>();
+    type SelInfo = { pages: number[]; sortTop: number; sortLeft: number };
+    const infoBySelection = new Map<string, SelInfo>();
     for (const s of selections) {
       const pages = Array.from(
         new Set(s.spans.map((sp) => sp.page).filter((p) => Number.isFinite(p))),
       ).sort((a, b) => a - b);
-      pagesBySelection.set(s.id, pages);
+      const minPage = pages[0];
+      let sortTop = Number.POSITIVE_INFINITY;
+      let sortLeft = Number.POSITIVE_INFINITY;
+      if (minPage !== undefined) {
+        for (const sp of s.spans) {
+          if (sp.page !== minPage) continue;
+          if (sp.bbox[1] < sortTop) sortTop = sp.bbox[1];
+          if (sp.bbox[0] < sortLeft) sortLeft = sp.bbox[0];
+        }
+      }
+      infoBySelection.set(s.id, { pages, sortTop, sortLeft });
     }
     const rows: Row[] = [];
     for (const [sid, convs] of Object.entries(convsBySelection)) {
-      const pages = pagesBySelection.get(sid) ?? [];
+      const info = infoBySelection.get(sid) ?? {
+        pages: [],
+        sortTop: Number.POSITIVE_INFINITY,
+        sortLeft: Number.POSITIVE_INFINITY,
+      };
       for (const c of convs) {
-        rows.push({ conv: c, selectionId: sid, pages });
+        rows.push({
+          conv: c,
+          selectionId: sid,
+          pages: info.pages,
+          sortTop: info.sortTop,
+          sortLeft: info.sortLeft,
+        });
       }
     }
-    rows.sort((a, b) => {
-      if (b.conv.updated_at !== a.conv.updated_at) {
-        return b.conv.updated_at - a.conv.updated_at;
-      }
-      return a.conv.id < b.conv.id ? -1 : 1;
-    });
     return rows;
   }, [selections, convsBySelection]);
 
+  const sortedRows = useMemo<Row[]>(() => {
+    const rows = allRows.slice();
+    if (sort === "date") {
+      rows.sort((a, b) => {
+        if (b.conv.updated_at !== a.conv.updated_at) {
+          return b.conv.updated_at - a.conv.updated_at;
+        }
+        return a.conv.id < b.conv.id ? -1 : 1;
+      });
+    } else {
+      rows.sort((a, b) => {
+        const ap = a.pages[0] ?? Number.POSITIVE_INFINITY;
+        const bp = b.pages[0] ?? Number.POSITIVE_INFINITY;
+        if (ap !== bp) return ap - bp;
+        if (a.sortTop !== b.sortTop) return a.sortTop - b.sortTop;
+        if (a.sortLeft !== b.sortLeft) return a.sortLeft - b.sortLeft;
+        if (b.conv.updated_at !== a.conv.updated_at) {
+          return b.conv.updated_at - a.conv.updated_at;
+        }
+        return a.conv.id < b.conv.id ? -1 : 1;
+      });
+    }
+    return rows;
+  }, [allRows, sort]);
+
   const visibleRows = useMemo(() => {
-    if (filter === "all") return allRows;
-    return allRows.filter((r) => r.pages.includes(currentPage));
-  }, [allRows, filter, currentPage]);
+    if (filter === "all") return sortedRows;
+    return sortedRows.filter((r) => r.pages.includes(currentPage));
+  }, [sortedRows, filter, currentPage]);
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
-          <FilterButton
-            active={filter === "page"}
-            onClick={() => setFilter("page")}
-          >
-            This page
-          </FilterButton>
-          <FilterButton
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-          >
-            All pages
-          </FilterButton>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+        <div className="flex flex-wrap gap-x-2 gap-y-1.5">
+          <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
+            <FilterButton
+              active={filter === "page"}
+              onClick={() => setFilter("page")}
+            >
+              This page
+            </FilterButton>
+            <FilterButton
+              active={filter === "all"}
+              onClick={() => setFilter("all")}
+            >
+              All pages
+            </FilterButton>
+          </div>
+          <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
+            <FilterButton
+              active={sort === "date"}
+              onClick={() => setSort("date")}
+            >
+              Date
+            </FilterButton>
+            <FilterButton
+              active={sort === "page"}
+              onClick={() => setSort("page")}
+            >
+              Page
+            </FilterButton>
+          </div>
         </div>
         <span className="text-xs text-zinc-500">
           {visibleRows.length}{" "}

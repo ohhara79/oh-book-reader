@@ -29,12 +29,6 @@ export type Sel = {
   selectionText: string;
 };
 
-export type ConvSummary = {
-  count: number;
-  updatedAt: number;
-  title: string;
-};
-
 export type ThreadHeading = {
   convId: string;
   title: string;
@@ -50,7 +44,6 @@ type Props = {
   pageDims: Record<number, { width: number; height: number }>;
   pageWrapperRefs: RefObject<Map<number, HTMLDivElement>>;
   selections: Sel[];
-  convSummaryBySelection: Record<string, ConvSummary>;
   threadHeadingsBySelection: Record<string, ThreadHeading[]>;
   onCapture: (cap: CapturedSelection) => void;
   onPinClick: (selectionId: string) => void;
@@ -90,7 +83,6 @@ export default function SelectionOverlay({
   pageDims,
   pageWrapperRefs,
   selections,
-  convSummaryBySelection,
   threadHeadingsBySelection,
   onCapture,
   onPinClick,
@@ -659,9 +651,9 @@ export default function SelectionOverlay({
           </div>
           <ul className="max-h-72 overflow-y-auto py-1">
             {stackPicker.selectionIds.map((sid, i) => {
+              const headings = threadHeadingsBySelection[sid] ?? [];
               const sel = selections.find((s) => s.id === sid);
-              const text = sel?.selectionText?.trim() || "(no text)";
-              const summary = convSummaryBySelection[sid];
+              const fallbackText = sel?.selectionText?.trim() || "(no text)";
               return (
                 <li key={sid}>
                   <button
@@ -675,11 +667,29 @@ export default function SelectionOverlay({
                     }}
                     className="block w-full px-3 py-2 text-left hover:bg-amber-500/15 focus:bg-amber-500/20 focus:outline-none active:bg-amber-500/30"
                   >
-                    <div className="line-clamp-2 text-sm">{text}</div>
-                    {summary && summary.count > 1 && (
-                      <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                        {summary.count} threads
-                      </div>
+                    {headings.length > 0 ? (
+                      <ul className="space-y-1.5">
+                        {headings.map((h, hi) => (
+                          <li
+                            key={h.convId}
+                            className={
+                              hi > 0
+                                ? "border-t border-zinc-100 pt-1.5 dark:border-zinc-800"
+                                : undefined
+                            }
+                          >
+                            <ThreadHeadingRow
+                              title={h.title}
+                              pages={h.pages}
+                              updatedAt={h.updatedAt}
+                              askCount={h.askCount}
+                              memoCount={h.memoCount}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="line-clamp-2 text-sm">{fallbackText}</div>
                     )}
                   </button>
                 </li>

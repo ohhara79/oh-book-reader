@@ -517,23 +517,6 @@ export default function Reader({ bookId }: { bookId: string }) {
     [selections],
   );
 
-  const convSummaryBySelection = useMemo(() => {
-    const m: Record<
-      string,
-      { count: number; updatedAt: number; title: string }
-    > = {};
-    for (const [sid, cs] of Object.entries(convsBySelection)) {
-      if (!cs.length) continue;
-      const top = cs.reduce((a, b) => (a.updated_at > b.updated_at ? a : b));
-      m[sid] = {
-        count: cs.length,
-        updatedAt: top.updated_at,
-        title: top.title,
-      };
-    }
-    return m;
-  }, [convsBySelection]);
-
   const threadHeadingsBySelection = useMemo(() => {
     const pagesBySel = new Map<string, number[]>();
     for (const s of selections) {
@@ -825,7 +808,6 @@ export default function Reader({ bookId }: { bookId: string }) {
                   pageDims={pageDims}
                   pageWrapperRefs={pageWrapperRefs}
                   selections={overlaySelections}
-                  convSummaryBySelection={convSummaryBySelection}
                   threadHeadingsBySelection={threadHeadingsBySelection}
                   onCapture={onCapture}
                   onPinClick={onPinClick}

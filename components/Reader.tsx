@@ -38,7 +38,13 @@ type SelSpan = {
 };
 type Sel = { id: string; spans: SelSpan[] };
 
-type ConvSummary = { id: string; title: string; updated_at: number };
+type ConvSummary = {
+  id: string;
+  title: string;
+  updated_at: number;
+  askCount: number;
+  memoCount: number;
+};
 
 type ConversationsBySelection = Record<string, ConvSummary[]>;
 

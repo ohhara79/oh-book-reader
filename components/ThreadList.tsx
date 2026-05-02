@@ -12,6 +12,8 @@ export type ThreadListConv = {
   id: string;
   title: string;
   updated_at: number;
+  askCount: number;
+  memoCount: number;
 };
 
 type Props = {
@@ -226,7 +228,9 @@ export default function ThreadList({
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-zinc-500">
-                  {formatTimestamp(r.conv.updated_at)}
+                  {formatTimestamp(r.conv.updated_at)} ·{" "}
+                  {pluralize(r.conv.askCount, "ask")} ·{" "}
+                  {pluralize(r.conv.memoCount, "memo")}
                 </div>
               </button>
             </li>
@@ -259,6 +263,10 @@ function FilterButton({
       {children}
     </button>
   );
+}
+
+function pluralize(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
 function formatPages(pages: number[]): string {

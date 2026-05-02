@@ -534,6 +534,41 @@ export default function Reader({ bookId }: { bookId: string }) {
     return m;
   }, [convsBySelection]);
 
+  const threadHeadingsBySelection = useMemo(() => {
+    const pagesBySel = new Map<string, number[]>();
+    for (const s of selections) {
+      const pages = Array.from(
+        new Set(s.spans.map((sp) => sp.page).filter((p) => Number.isFinite(p))),
+      ).sort((a, b) => a - b);
+      pagesBySel.set(s.id, pages);
+    }
+    const m: Record<
+      string,
+      {
+        convId: string;
+        title: string;
+        updatedAt: number;
+        askCount: number;
+        memoCount: number;
+        pages: number[];
+      }[]
+    > = {};
+    for (const [sid, cs] of Object.entries(convsBySelection)) {
+      if (!cs.length) continue;
+      const pages = pagesBySel.get(sid) ?? [];
+      const sorted = cs.slice().sort((a, b) => b.updated_at - a.updated_at);
+      m[sid] = sorted.map((c) => ({
+        convId: c.id,
+        title: c.title,
+        updatedAt: c.updated_at,
+        askCount: c.askCount,
+        memoCount: c.memoCount,
+        pages,
+      }));
+    }
+    return m;
+  }, [selections, convsBySelection]);
+
   const onSplitterDrag = useCallback((clientX: number) => {
     setSidebarWidth(clampSidebarWidth(window.innerWidth - clientX));
   }, []);
@@ -791,6 +826,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   pageWrapperRefs={pageWrapperRefs}
                   selections={overlaySelections}
                   convSummaryBySelection={convSummaryBySelection}
+                  threadHeadingsBySelection={threadHeadingsBySelection}
                   onCapture={onCapture}
                   onPinClick={onPinClick}
                   highlightedSelectionId={hoveredSelectionId}

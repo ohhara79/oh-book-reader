@@ -7,6 +7,8 @@ import {
   useState,
   type RefObject,
 } from "react";
+import ThreadHeadingRow from "./ThreadHeadingRow";
+import { formatPages } from "@/lib/threadFormat";
 
 export type CapturedSpan = {
   page: number;
@@ -33,6 +35,15 @@ export type ConvSummary = {
   title: string;
 };
 
+export type ThreadHeading = {
+  convId: string;
+  title: string;
+  updatedAt: number;
+  askCount: number;
+  memoCount: number;
+  pages: number[];
+};
+
 type Props = {
   scale: number;
   pageOffsets: Record<number, { top: number; left: number }>;
@@ -40,6 +51,7 @@ type Props = {
   pageWrapperRefs: RefObject<Map<number, HTMLDivElement>>;
   selections: Sel[];
   convSummaryBySelection: Record<string, ConvSummary>;
+  threadHeadingsBySelection: Record<string, ThreadHeading[]>;
   onCapture: (cap: CapturedSelection) => void;
   onPinClick: (selectionId: string) => void;
   highlightedSelectionId?: string | null;
@@ -50,6 +62,14 @@ type StackPicker = {
   anchorY: number;
   selectionIds: string[];
 };
+
+type HoverTip = {
+  clientX: number;
+  clientY: number;
+  selectionIds: string[];
+};
+
+const HOVER_TIP_MAX_ROWS = 6;
 
 type Drag = {
   startX: number;
@@ -71,6 +91,7 @@ export default function SelectionOverlay({
   pageWrapperRefs,
   selections,
   convSummaryBySelection,
+  threadHeadingsBySelection,
   onCapture,
   onPinClick,
   highlightedSelectionId = null,
@@ -78,6 +99,7 @@ export default function SelectionOverlay({
   const overlayRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const firstRowRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const dragMovedRef = useRef(false);
   const armedRef = useRef(false);
   const capturedRef = useRef(false);
@@ -90,6 +112,10 @@ export default function SelectionOverlay({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [stackPicker, setStackPicker] = useState<StackPicker | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [hoverTip, setHoverTip] = useState<HoverTip | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
     null,
   );
 
@@ -163,6 +189,39 @@ export default function SelectionOverlay({
     if (stackPicker) firstRowRef.current?.focus();
   }, [stackPicker]);
 
+  // Position the hover tooltip near the cursor and clamp inside the viewport.
+  // Uses client coords directly because the tooltip is position: fixed.
+  useLayoutEffect(() => {
+    if (!hoverTip) {
+      setTooltipPos(null);
+      return;
+    }
+    const el = tooltipRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    let x = hoverTip.clientX + 14;
+    let y = hoverTip.clientY + 18;
+    if (x + r.width > window.innerWidth - margin) {
+      x = window.innerWidth - margin - r.width;
+    }
+    if (y + r.height > window.innerHeight - margin) {
+      y = window.innerHeight - margin - r.height;
+    }
+    if (x < margin) x = margin;
+    if (y < margin) y = margin;
+    setTooltipPos({ x, y });
+  }, [hoverTip]);
+
+  // Dismiss the hover tooltip on scroll — the cursor and the underlying box
+  // can drift apart while scrolling, leaving a stale tooltip in place.
+  useEffect(() => {
+    if (!hoverTip) return;
+    const onScroll = () => setHoverTip(null);
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [hoverTip]);
+
   function clientToOverlay(clientX: number, clientY: number) {
     const r = overlayRef.current!.getBoundingClientRect();
     return { x: clientX - r.left, y: clientY - r.top };
@@ -185,6 +244,21 @@ export default function SelectionOverlay({
       }
     }
     return ids;
+  }
+
+  function updateHoverTip(e: React.MouseEvent<HTMLElement>) {
+    if (drag || stackPicker) {
+      if (hoverTip) setHoverTip(null);
+      return;
+    }
+    const ids = selectionIdsAtClient(e.clientX, e.clientY).filter(
+      (sid) => (threadHeadingsBySelection[sid]?.length ?? 0) > 0,
+    );
+    if (ids.length === 0) {
+      if (hoverTip) setHoverTip(null);
+      return;
+    }
+    setHoverTip({ clientX: e.clientX, clientY: e.clientY, selectionIds: ids });
   }
 
   function findHorizontalScroller(): HTMLElement | null {
@@ -231,6 +305,7 @@ export default function SelectionOverlay({
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!e.isPrimary) return;
     if (e.button !== 0) return;
+    setHoverTip(null);
     if (e.pointerType === "touch") {
       pointerStartRef.current = { x: e.clientX, y: e.clientY };
       pointerIdRef.current = e.pointerId;
@@ -542,6 +617,9 @@ export default function SelectionOverlay({
             width: p.width,
             height: p.height,
           }}
+          onMouseEnter={updateHoverTip}
+          onMouseMove={updateHoverTip}
+          onMouseLeave={() => setHoverTip(null)}
           onClick={(e) => {
             e.stopPropagation();
             if (dragMovedRef.current) {
@@ -610,6 +688,79 @@ export default function SelectionOverlay({
           </ul>
         </div>
       )}
+      {hoverTip && !drag && !stackPicker && (() => {
+        const groups = hoverTip.selectionIds
+          .map((sid) => ({
+            sid,
+            headings: threadHeadingsBySelection[sid] ?? [],
+          }))
+          .filter((g) => g.headings.length > 0);
+        if (groups.length === 0) return null;
+        const totalRows = groups.reduce((n, g) => n + g.headings.length, 0);
+        const showGroupHeaders = groups.length > 1;
+        let remaining = HOVER_TIP_MAX_ROWS;
+        return (
+          <div
+            ref={tooltipRef}
+            role="tooltip"
+            className="fixed w-72 max-w-[80vw] rounded-md border border-zinc-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/95"
+            style={{
+              left: tooltipPos?.x ?? hoverTip.clientX + 14,
+              top: tooltipPos?.y ?? hoverTip.clientY + 18,
+              zIndex: 60,
+              pointerEvents: "none",
+              visibility: tooltipPos ? "visible" : "hidden",
+            }}
+          >
+            {groups.map((g, gi) => {
+              if (remaining <= 0) return null;
+              const slice = g.headings.slice(0, remaining);
+              remaining -= slice.length;
+              return (
+                <div
+                  key={g.sid}
+                  className={
+                    gi > 0
+                      ? "mt-2 border-t border-zinc-100 pt-2 dark:border-zinc-800"
+                      : undefined
+                  }
+                >
+                  {showGroupHeaders && (
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+                      {formatPages(g.headings[0].pages)}
+                    </div>
+                  )}
+                  <ul className="space-y-1.5">
+                    {slice.map((h, hi) => (
+                      <li
+                        key={h.convId}
+                        className={
+                          hi > 0
+                            ? "border-t border-zinc-100 pt-1.5 dark:border-zinc-800"
+                            : undefined
+                        }
+                      >
+                        <ThreadHeadingRow
+                          title={h.title}
+                          pages={h.pages}
+                          updatedAt={h.updatedAt}
+                          askCount={h.askCount}
+                          memoCount={h.memoCount}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+            {totalRows > HOVER_TIP_MAX_ROWS && (
+              <div className="mt-1.5 border-t border-zinc-100 pt-1.5 text-xs text-zinc-500 dark:border-zinc-800">
+                +{totalRows - HOVER_TIP_MAX_ROWS} more
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

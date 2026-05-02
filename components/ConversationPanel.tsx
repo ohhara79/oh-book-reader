@@ -88,6 +88,11 @@ export default function ConversationPanel({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
+  const titleComposingRef = useRef(false);
+  const savingTitleRef = useRef(false);
+  const titleBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Reset / load when `active` changes (controlled by `key` from parent).
   useEffect(() => {
@@ -104,6 +109,12 @@ export default function ConversationPanel({
     setTitleDraft("");
     setSavingTitle(false);
     newConvSentRef.current = false;
+    titleComposingRef.current = false;
+    savingTitleRef.current = false;
+    if (titleBlurTimeoutRef.current) {
+      clearTimeout(titleBlurTimeoutRef.current);
+      titleBlurTimeoutRef.current = null;
+    }
 
     if (!active) return;
 
@@ -344,17 +355,27 @@ export default function ConversationPanel({
   }
 
   function cancelTitleEdit() {
+    if (titleBlurTimeoutRef.current) {
+      clearTimeout(titleBlurTimeoutRef.current);
+      titleBlurTimeoutRef.current = null;
+    }
     setEditingTitle(false);
     setTitleDraft("");
   }
 
   async function saveTitle() {
+    if (titleBlurTimeoutRef.current) {
+      clearTimeout(titleBlurTimeoutRef.current);
+      titleBlurTimeoutRef.current = null;
+    }
+    if (savingTitleRef.current) return;
     if (!conversationId || !rawConversation) return;
     const next = titleDraft.trim();
     if (next === (rawConversation.title ?? "")) {
       setEditingTitle(false);
       return;
     }
+    savingTitleRef.current = true;
     setSavingTitle(true);
     setError(null);
     try {
@@ -374,6 +395,7 @@ export default function ConversationPanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      savingTitleRef.current = false;
       setSavingTitle(false);
     }
   }
@@ -454,13 +476,39 @@ export default function ConversationPanel({
                 ref={titleInputRef}
                 type="text"
                 value={titleDraft}
-                disabled={savingTitle}
                 maxLength={200}
                 onChange={(e) => setTitleDraft(e.target.value)}
+                onCompositionStart={() => {
+                  titleComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  titleComposingRef.current = false;
+                }}
+                onFocus={() => {
+                  if (titleBlurTimeoutRef.current) {
+                    clearTimeout(titleBlurTimeoutRef.current);
+                    titleBlurTimeoutRef.current = null;
+                  }
+                }}
                 onBlur={() => {
-                  if (editingTitle) void saveTitle();
+                  if (titleComposingRef.current) return;
+                  if (titleBlurTimeoutRef.current) {
+                    clearTimeout(titleBlurTimeoutRef.current);
+                  }
+                  titleBlurTimeoutRef.current = setTimeout(() => {
+                    titleBlurTimeoutRef.current = null;
+                    if (
+                      document.activeElement === titleInputRef.current ||
+                      titleComposingRef.current
+                    ) {
+                      return;
+                    }
+                    void saveTitle();
+                  }, 200);
                 }}
                 onKeyDown={(e) => {
+                  if (titleComposingRef.current || e.nativeEvent.isComposing)
+                    return;
                   if (e.key === "Enter") {
                     e.preventDefault();
                     void saveTitle();

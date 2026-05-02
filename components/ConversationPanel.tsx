@@ -455,21 +455,6 @@ export default function ConversationPanel({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
-                className="md:hidden"
-              >
-                <path d="M10 4 5 8l5 4" />
-              </svg>
-              <svg
-                viewBox="0 0 16 16"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className="hidden md:block"
               >
                 <path d="M4 4l8 8" />
                 <path d="M12 4l-8 8" />

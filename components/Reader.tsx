@@ -438,14 +438,49 @@ export default function Reader({ bookId }: { bookId: string }) {
         hoverScrollTimerRef.current = null;
       }
       if (!selectionId || pages.length === 0) return;
-      if (pages.includes(pageNumRef.current)) return;
-      const target = pages[0];
+
+      // Pick the topmost span (smallest page, then smallest y) so we
+      // aim the scroll at the start of the highlighted region.
+      const sel = selections.find((s) => s.id === selectionId);
+      if (!sel || sel.spans.length === 0) return;
+      let target = sel.spans[0];
+      for (const sp of sel.spans) {
+        if (sp.page < target.page) target = sp;
+        else if (sp.page === target.page && sp.bbox[1] < target.bbox[1])
+          target = sp;
+      }
+      const targetPage = target.page;
+      const targetBbox = target.bbox;
+
       hoverScrollTimerRef.current = setTimeout(() => {
         hoverScrollTimerRef.current = null;
-        scrollToPage(target);
+        const main = mainRef.current;
+        const wrapper = pageWrapperRefs.current.get(targetPage);
+        if (!main || !wrapper) return;
+        // If real page dims aren't loaded yet, the wrapper is a 600x800
+        // placeholder; bbox math would be wrong. Fall back to page top.
+        if (!pageDims[targetPage]) {
+          scrollToPage(targetPage);
+          return;
+        }
+        const wrapperTop =
+          wrapper.getBoundingClientRect().top -
+          main.getBoundingClientRect().top +
+          main.scrollTop;
+        const s = scaleRef.current;
+        const boxTop = wrapperTop + targetBbox[1] * s;
+        const boxBottom = boxTop + targetBbox[3] * s;
+        const viewTop = main.scrollTop;
+        const viewBottom = viewTop + main.clientHeight;
+        const PAD = 16;
+        if (boxTop >= viewTop + PAD && boxBottom <= viewBottom - PAD) return;
+        main.scrollTo({
+          top: Math.max(0, boxTop - PAD),
+          behavior: "smooth",
+        });
       }, 150);
     },
-    [scrollToPage],
+    [pageDims, scrollToPage, selections],
   );
 
   useEffect(

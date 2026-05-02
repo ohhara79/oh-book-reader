@@ -419,6 +419,15 @@ export default function Reader({ bookId }: { bookId: string }) {
     [],
   );
 
+  const stepScale = (delta: number) => {
+    const next = Math.max(SCALE_MIN, Math.min(SCALE_MAX, scale + delta));
+    if ((scale < 1 && next > 1) || (scale > 1 && next < 1)) {
+      handleScaleChange(1);
+    } else {
+      handleScaleChange(next);
+    }
+  };
+
   const onCapture = useCallback((cap: CapturedSelection) => {
     setActive({ kind: "new", capture: cap });
   }, []);
@@ -731,9 +740,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <span className="ml-3 flex items-center gap-1">
             <button
               type="button"
-              onClick={() =>
-                handleScaleChange(Math.max(SCALE_MIN, scale - 0.2))
-              }
+              onClick={() => stepScale(-0.2)}
               className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom out"
               title="Zoom out"
@@ -757,9 +764,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             </span>
             <button
               type="button"
-              onClick={() =>
-                handleScaleChange(Math.min(SCALE_MAX, scale + 0.2))
-              }
+              onClick={() => stepScale(0.2)}
               className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom in"
               title="Zoom in"

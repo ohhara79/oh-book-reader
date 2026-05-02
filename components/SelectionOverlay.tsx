@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 export type CapturedSpan = {
   page: number;
@@ -15,7 +21,17 @@ export type CapturedSpan = {
 export type CapturedSelection = { spans: CapturedSpan[] };
 
 type SelSpan = { page: number; bbox: [number, number, number, number] };
-type Sel = { id: string; spans: SelSpan[] };
+export type Sel = {
+  id: string;
+  spans: SelSpan[];
+  selectionText: string;
+};
+
+export type ConvSummary = {
+  count: number;
+  updatedAt: number;
+  title: string;
+};
 
 type Props = {
   scale: number;
@@ -23,8 +39,15 @@ type Props = {
   pageDims: Record<number, { width: number; height: number }>;
   pageWrapperRefs: RefObject<Map<number, HTMLDivElement>>;
   selections: Sel[];
+  convSummaryBySelection: Record<string, ConvSummary>;
   onCapture: (cap: CapturedSelection) => void;
   onPinClick: (selectionId: string) => void;
+};
+
+type StackPicker = {
+  anchorX: number;
+  anchorY: number;
+  selectionIds: string[];
 };
 
 type Drag = {
@@ -46,10 +69,13 @@ export default function SelectionOverlay({
   pageDims,
   pageWrapperRefs,
   selections,
+  convSummaryBySelection,
   onCapture,
   onPinClick,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const firstRowRef = useRef<HTMLButtonElement>(null);
   const dragMovedRef = useRef(false);
   const armedRef = useRef(false);
   const capturedRef = useRef(false);
@@ -60,6 +86,10 @@ export default function SelectionOverlay({
   const horizontalScrollerRef = useRef<HTMLElement | null>(null);
   const lastPanXRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [stackPicker, setStackPicker] = useState<StackPicker | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -69,9 +99,90 @@ export default function SelectionOverlay({
     };
   }, []);
 
+  // Dismiss the stack-picker popover on outside-click, Escape, or scroll.
+  // Scroll dismissal matters because the anchor lives in overlay-relative
+  // coords; if the user scrolls the PDF the anchor would drift.
+  useEffect(() => {
+    if (!stackPicker) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      const pop = popoverRef.current;
+      if (pop && e.target instanceof Node && pop.contains(e.target)) return;
+      setStackPicker(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setStackPicker(null);
+      }
+    };
+    const onScroll = () => setStackPicker(null);
+    document.addEventListener("pointerdown", onDocPointerDown, true);
+    document.addEventListener("keydown", onKey, true);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDocPointerDown, true);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [stackPicker]);
+
+  // Position the popover so it stays inside the viewport. Renders once at the
+  // anchor, then this effect measures and shifts it before paint if it would
+  // overflow the right or bottom edge.
+  useLayoutEffect(() => {
+    if (!stackPicker) {
+      setPopoverPos(null);
+      return;
+    }
+    const el = popoverRef.current;
+    const overlay = overlayRef.current;
+    if (!el || !overlay) return;
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    let x = stackPicker.anchorX;
+    let y = stackPicker.anchorY;
+    if (r.right > window.innerWidth - margin) {
+      x -= r.right - (window.innerWidth - margin);
+    }
+    if (r.bottom > window.innerHeight - margin) {
+      y -= r.bottom - (window.innerHeight - margin);
+    }
+    // Don't go off the top/left of the overlay either.
+    const overlayRect = overlay.getBoundingClientRect();
+    const minLeftInOverlay = -(overlayRect.left) + margin;
+    const minTopInOverlay = -(overlayRect.top) + margin;
+    if (x < minLeftInOverlay) x = minLeftInOverlay;
+    if (y < minTopInOverlay) y = minTopInOverlay;
+    setPopoverPos({ x, y });
+  }, [stackPicker]);
+
+  // Move focus into the popover when it opens for keyboard users.
+  useEffect(() => {
+    if (stackPicker) firstRowRef.current?.focus();
+  }, [stackPicker]);
+
   function clientToOverlay(clientX: number, clientY: number) {
     const r = overlayRef.current!.getBoundingClientRect();
     return { x: clientX - r.left, y: clientY - r.top };
+  }
+
+  // Returns the distinct selection IDs whose pin button (including its
+  // expanded ::before hit area) sits under the given client point. Uses the
+  // browser's own hit-test so the expanded click area matches what the user
+  // perceives, not just the visible bbox.
+  function selectionIdsAtClient(clientX: number, clientY: number): string[] {
+    const els = document.elementsFromPoint(clientX, clientY);
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const el of els) {
+      if (!(el instanceof HTMLElement)) continue;
+      const id = el.dataset.pinSelectionId;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
+    }
+    return ids;
   }
 
   function findHorizontalScroller(): HTMLElement | null {
@@ -391,6 +502,7 @@ export default function SelectionOverlay({
         <button
           key={`${p.selectionId}-${i}`}
           type="button"
+          data-pin-selection-id={p.selectionId}
           aria-label={`Open conversation for selection ${p.selectionId}`}
           className="absolute cursor-pointer border-2 border-amber-500 bg-amber-500/10 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40"
           style={{
@@ -406,10 +518,67 @@ export default function SelectionOverlay({
               dragMovedRef.current = false;
               return;
             }
-            onPinClick(p.selectionId);
+            const ids = selectionIdsAtClient(e.clientX, e.clientY);
+            if (ids.length <= 1) {
+              onPinClick(p.selectionId);
+              return;
+            }
+            const { x, y } = clientToOverlay(e.clientX, e.clientY);
+            setStackPicker({ anchorX: x, anchorY: y, selectionIds: ids });
           }}
         />
       ))}
+      {stackPicker && (
+        <div
+          ref={popoverRef}
+          role="menu"
+          aria-label="Overlapping highlights"
+          className="absolute z-20 w-72 max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-zinc-200 bg-white text-zinc-900 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          style={{
+            left: popoverPos?.x ?? stackPicker.anchorX,
+            top: popoverPos?.y ?? stackPicker.anchorY,
+            visibility: popoverPos ? "visible" : "hidden",
+          }}
+          onPointerDown={(e) => {
+            // Keep the overlay's drag/long-press from arming when the user
+            // interacts with the popover.
+            e.stopPropagation();
+          }}
+        >
+          <div className="border-b border-zinc-100 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+            {stackPicker.selectionIds.length} highlights here
+          </div>
+          <ul className="max-h-72 overflow-y-auto py-1">
+            {stackPicker.selectionIds.map((sid, i) => {
+              const sel = selections.find((s) => s.id === sid);
+              const text = sel?.selectionText?.trim() || "(no text)";
+              const summary = convSummaryBySelection[sid];
+              return (
+                <li key={sid}>
+                  <button
+                    ref={i === 0 ? firstRowRef : undefined}
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPinClick(sid);
+                      setStackPicker(null);
+                    }}
+                    className="block w-full px-3 py-2 text-left hover:bg-amber-500/15 focus:bg-amber-500/20 focus:outline-none active:bg-amber-500/30"
+                  >
+                    <div className="line-clamp-2 text-sm">{text}</div>
+                    {summary && summary.count > 1 && (
+                      <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                        {summary.count} threads
+                      </div>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

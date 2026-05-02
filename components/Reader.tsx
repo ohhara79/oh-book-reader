@@ -31,7 +31,11 @@ type Book = {
   page_count: number;
 };
 
-type SelSpan = { page: number; bbox: [number, number, number, number] };
+type SelSpan = {
+  page: number;
+  bbox: [number, number, number, number];
+  extracted_text?: string;
+};
 type Sel = { id: string; spans: SelSpan[] };
 
 type ConvSummary = { id: string; title: string; updated_at: number };
@@ -420,6 +424,41 @@ export default function Reader({ bookId }: { bookId: string }) {
     [convsBySelection],
   );
 
+  // Enrich selections with a single text snippet per selection so the
+  // overlap-disambiguation popover can identify each one. Joining all spans
+  // gives a coherent preview when a selection wraps multiple paragraphs.
+  const overlaySelections = useMemo(
+    () =>
+      selections.map((s) => ({
+        id: s.id,
+        spans: s.spans,
+        selectionText: s.spans
+          .map((sp) => sp.extracted_text ?? "")
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      })),
+    [selections],
+  );
+
+  const convSummaryBySelection = useMemo(() => {
+    const m: Record<
+      string,
+      { count: number; updatedAt: number; title: string }
+    > = {};
+    for (const [sid, cs] of Object.entries(convsBySelection)) {
+      if (!cs.length) continue;
+      const top = cs.reduce((a, b) => (a.updated_at > b.updated_at ? a : b));
+      m[sid] = {
+        count: cs.length,
+        updatedAt: top.updated_at,
+        title: top.title,
+      };
+    }
+    return m;
+  }, [convsBySelection]);
+
   const onSplitterDrag = useCallback((clientX: number) => {
     setSidebarWidth(clampSidebarWidth(window.innerWidth - clientX));
   }, []);
@@ -675,7 +714,8 @@ export default function Reader({ bookId }: { bookId: string }) {
                   pageOffsets={pageOffsets}
                   pageDims={pageDims}
                   pageWrapperRefs={pageWrapperRefs}
-                  selections={selections}
+                  selections={overlaySelections}
+                  convSummaryBySelection={convSummaryBySelection}
                   onCapture={onCapture}
                   onPinClick={onPinClick}
                 />

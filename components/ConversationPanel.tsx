@@ -1,6 +1,13 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
@@ -135,6 +142,8 @@ type Props = {
   onCreated: () => void;
   onClose: () => void;
   onThreadHover?: (selectionId: string | null, pages: number[]) => void;
+  initialListScrollTop?: number;
+  onListScrollSave?: (scrollTop: number) => void;
 };
 
 type DisplayMessage =
@@ -168,6 +177,8 @@ export default function ConversationPanel({
   onCreated,
   onClose,
   onThreadHover,
+  initialListScrollTop = 0,
+  onListScrollSave,
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -346,11 +357,21 @@ export default function ConversationPanel({
   }, [active]);
 
   useEffect(() => {
+    if (!active) return;
     scrollerRef.current?.scrollTo({
       top: scrollerRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, streaming]);
+  }, [messages, streaming, active]);
+
+  const listScrollRestoredRef = useRef(false);
+  useLayoutEffect(() => {
+    if (active || listScrollRestoredRef.current) return;
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTop = initialListScrollTop;
+    listScrollRestoredRef.current = true;
+  }, [active, initialListScrollTop]);
 
   const exportMarkdown = useMemo(() => {
     if (!rawConversation) return "";
@@ -988,7 +1009,11 @@ export default function ConversationPanel({
                 visibleRows={threadListState.visibleRows}
                 filter={threadListState.filter}
                 currentPage={pageNum}
-                onOpen={onOpenConversation}
+                onOpen={(id) => {
+                  const top = scrollerRef.current?.scrollTop ?? 0;
+                  onListScrollSave?.(top);
+                  onOpenConversation(id);
+                }}
                 onHover={onThreadHover}
               />
               <p className="px-1 text-xs text-zinc-500">

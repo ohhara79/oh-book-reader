@@ -120,6 +120,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const scaleRef = useRef(scale);
   const ioRafRef = useRef<number | null>(null);
   const restoreScrollDoneRef = useRef(false);
+  const threadListScrollTopRef = useRef(0);
   const hoverScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -838,6 +839,10 @@ export default function Reader({ bookId }: { bookId: string }) {
             onCreated={onConversationCreated}
             onClose={() => setActive(null)}
             onThreadHover={handleThreadHover}
+            initialListScrollTop={threadListScrollTopRef.current}
+            onListScrollSave={(top) => {
+              threadListScrollTopRef.current = top;
+            }}
           />
         </aside>
       </div>

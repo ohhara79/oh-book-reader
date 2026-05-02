@@ -665,7 +665,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <button
             type="button"
             onClick={goPrev}
-            className="rounded border px-3 py-2 disabled:opacity-50 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
+            className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={pageNum <= 1}
             aria-label="Previous page"
           >
@@ -708,7 +708,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <button
             type="button"
             onClick={goNext}
-            className="rounded border px-3 py-2 disabled:opacity-50 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
+            className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={!!numPages && pageNum >= numPages}
             aria-label="Next page"
           >
@@ -732,7 +732,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               onClick={() =>
                 handleScaleChange(Math.max(SCALE_MIN, scale - 0.2))
               }
-              className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
+              className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom out"
             >
               <svg
@@ -757,7 +757,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               onClick={() =>
                 handleScaleChange(Math.min(SCALE_MAX, scale + 0.2))
               }
-              className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
+              className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom in"
             >
               <svg

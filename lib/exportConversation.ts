@@ -51,7 +51,7 @@ function turnSection(t: Turn, fallbackTs: number): string {
   if (t.role === "memo") {
     return `#### Memo · ${stamp}\n\n${body}\n`;
   }
-  const heading = t.role === "user" ? "You" : "Claude";
+  const heading = t.role === "user" ? "You" : "AI";
   return `### ${heading} · ${stamp}\n\n${body}\n`;
 }
 

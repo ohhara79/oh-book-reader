@@ -539,7 +539,7 @@ export default function ConversationPanel({
                 ? "New entry"
                 : active?.kind === "existing"
                   ? "Thread"
-                  : "Ask Claude"}
+                  : "Ask AI"}
             </span>
           )}
         </div>
@@ -692,8 +692,8 @@ export default function ConversationPanel({
             <p className="text-sm text-zinc-500">
               Drag a rectangle (or press and hold on touch) over a region of the
               page to start a thread. Use <strong>Memo</strong> to save your own
-              note, or <strong>Ask</strong> to query Claude. Memos appear inline
-              and Claude sees them as context on the next Ask.
+              note, or <strong>Ask</strong> to query AI. Memos appear inline
+              and the AI sees them as context on the next Ask.
             </p>
           ) : (
             <div className="space-y-3">
@@ -859,7 +859,7 @@ function MessageBubble({
       <div className="mb-1 flex items-center justify-between gap-2">
         {m.created_at != null ? (
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">
-            {isUser ? "ask" : "claude"} · {formatTimestamp(m.created_at)}
+            {isUser ? "ask" : "ai"} · {formatTimestamp(m.created_at)}
           </p>
         ) : (
           <span />

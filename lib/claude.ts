@@ -99,7 +99,7 @@ export async function* askClaude({
             message:
               typeof r.result === "string"
                 ? r.result
-                : "Claude returned an error",
+                : "AI returned an error",
           };
           return;
         }

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "oh-book-reader",
-  description: "PDF reader where you can ask Claude about any region of the page.",
+  description: "PDF reader where you can ask AI about any region of the page.",
 };
 
 export const viewport: Viewport = {

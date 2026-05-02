@@ -163,7 +163,6 @@ type ThreadListControlsProps = {
   setFilter: (f: FilterMode) => void;
   sort: SortMode;
   setSort: (s: SortMode) => void;
-  count: number;
 };
 
 export function ThreadListControls({
@@ -171,7 +170,6 @@ export function ThreadListControls({
   setFilter,
   sort,
   setSort,
-  count,
 }: ThreadListControlsProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -207,9 +205,6 @@ export function ThreadListControls({
           Page
         </FilterButton>
       </div>
-      <span className="text-xs text-zinc-500">
-        {count} {count === 1 ? "thread" : "threads"}
-      </span>
     </div>
   );
 }

@@ -895,7 +895,7 @@ export default function ConversationPanel({
                 ? "New entry"
                 : active?.kind === "existing"
                   ? "Thread"
-                  : "Ask AI"}
+                  : null}
             </span>
           )}
         </div>
@@ -906,7 +906,6 @@ export default function ConversationPanel({
               setFilter={threadListState.setFilter}
               sort={threadListState.sort}
               setSort={threadListState.setSort}
-              count={threadListState.visibleRows.length}
             />
           </div>
         )}

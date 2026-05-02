@@ -82,7 +82,11 @@ export default function ConversationPanel({
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [savingTitle, setSavingTitle] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
 
   // Reset / load when `active` changes (controlled by `key` from parent).
@@ -96,6 +100,9 @@ export default function ConversationPanel({
     setDeleting(false);
     setPosting(false);
     setCopied(false);
+    setEditingTitle(false);
+    setTitleDraft("");
+    setSavingTitle(false);
     newConvSentRef.current = false;
 
     if (!active) return;
@@ -326,6 +333,51 @@ export default function ConversationPanel({
     }
   }
 
+  function startTitleEdit() {
+    if (!rawConversation || savingTitle) return;
+    setTitleDraft(rawConversation.title ?? "");
+    setEditingTitle(true);
+    requestAnimationFrame(() => {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    });
+  }
+
+  function cancelTitleEdit() {
+    setEditingTitle(false);
+    setTitleDraft("");
+  }
+
+  async function saveTitle() {
+    if (!conversationId || !rawConversation) return;
+    const next = titleDraft.trim();
+    if (next === (rawConversation.title ?? "")) {
+      setEditingTitle(false);
+      return;
+    }
+    setSavingTitle(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      if (!r.ok) {
+        setError(`failed to rename: ${r.status}`);
+        return;
+      }
+      const j = (await r.json()) as { conversation: Conversation };
+      setRawConversation(j.conversation);
+      setEditingTitle(false);
+      onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingTitle(false);
+    }
+  }
+
   async function deleteConversation() {
     if (!conversationId || streaming || posting || deleting) return;
     if (
@@ -394,14 +446,51 @@ export default function ConversationPanel({
 
   return (
     <div className="flex h-full flex-col print:h-auto">
-      <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 text-sm print:hidden dark:border-zinc-800">
-        <span className="font-medium">
-          {active?.kind === "new"
-            ? "New entry"
-            : active?.kind === "existing"
-              ? "Thread"
-              : "Ask Claude"}
-        </span>
+      <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-4 py-2 text-sm print:hidden dark:border-zinc-800">
+        <div className="min-w-0 flex-1">
+          {active?.kind === "existing" && rawConversation ? (
+            editingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleDraft}
+                disabled={savingTitle}
+                maxLength={200}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => {
+                  if (editingTitle) void saveTitle();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void saveTitle();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancelTitleEdit();
+                  }
+                }}
+                className="block w-full rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-medium text-zinc-900 outline-none focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-400"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startTitleEdit}
+                title="Rename thread"
+                className="block w-full truncate rounded px-1.5 py-0.5 text-left font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                {rawConversation.title || "Untitled"}
+              </button>
+            )
+          ) : (
+            <span className="font-medium">
+              {active?.kind === "new"
+                ? "New entry"
+                : active?.kind === "existing"
+                  ? "Thread"
+                  : "Ask Claude"}
+            </span>
+          )}
+        </div>
         {active && (
           <div className="flex items-center gap-1">
             {active.kind === "existing" && conversationId && (

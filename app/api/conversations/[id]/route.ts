@@ -7,6 +7,7 @@ import {
   getSelection,
   listConversationsForBook,
   readSelectionImage,
+  saveConversation,
 } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -50,6 +51,44 @@ export async function GET(
     // selection missing or unreadable — omit capture, conversation still loads
   }
   return NextResponse.json({ bookId, conversation: conv, capture });
+}
+
+const TITLE_MAX = 200;
+
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const { id } = await ctx.params;
+  if (!CONVERSATION_ID_RE.test(id)) {
+    return new Response("not found", { status: 404 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response("bad request", { status: 400 });
+  }
+  if (!body || typeof body !== "object" || typeof (body as { title?: unknown }).title !== "string") {
+    return new Response("bad request", { status: 400 });
+  }
+  const title = (body as { title: string }).title.trim().slice(0, TITLE_MAX);
+
+  const bookId = await findConversationBookId(id);
+  if (!bookId) return new Response("not found", { status: 404 });
+
+  let conv;
+  try {
+    conv = await getConversation(bookId, id);
+  } catch {
+    return new Response("not found", { status: 404 });
+  }
+
+  conv.title = title;
+  await saveConversation(bookId, conv);
+
+  return NextResponse.json({ conversation: conv });
 }
 
 export async function DELETE(

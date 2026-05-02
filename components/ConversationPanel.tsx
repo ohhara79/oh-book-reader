@@ -12,7 +12,9 @@ import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
 import { formatTimestamp } from "@/lib/formatTimestamp";
-import type { Conversation, Turn } from "@/lib/store";
+import type { Conversation, Turn, TurnUsage } from "@/lib/store";
+import { MODEL_NAME } from "@/lib/contextWindows";
+import ContextUsageBadge from "./ContextUsageBadge";
 import {
   type Attachment,
   IMAGE_ATTACHMENT_MEDIA_TYPES,
@@ -158,6 +160,7 @@ type DisplayMessage =
       role: "assistant";
       text: string;
       created_at?: number;
+      usage?: TurnUsage;
     }
   | {
       role: "memo";
@@ -215,6 +218,14 @@ export default function ConversationPanel({
   const titleBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+
+  const latestUsage = useMemo<TurnUsage | undefined>(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === "assistant" && m.usage) return m.usage;
+    }
+    return undefined;
+  }, [messages]);
 
   async function addFiles(files: File[]) {
     if (files.length === 0) return;
@@ -474,6 +485,15 @@ export default function ConversationPanel({
             }
             return next;
           }),
+        onUsage: (usage) =>
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.role === "assistant") {
+              next[next.length - 1] = { ...last, usage };
+            }
+            return next;
+          }),
         onError: (m) => setError(m),
       });
       if (createdId) await loadConversation(createdId);
@@ -627,6 +647,15 @@ export default function ConversationPanel({
                 text: last.text + chunk,
                 created_at: last.created_at ?? Date.now(),
               };
+            }
+            return next;
+          }),
+        onUsage: (usage) =>
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.role === "assistant") {
+              next[next.length - 1] = { ...last, usage };
             }
             return next;
           }),
@@ -1399,7 +1428,10 @@ export default function ConversationPanel({
                 </svg>
               </button>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {latestUsage && (
+                <ContextUsageBadge usage={latestUsage} model={MODEL_NAME} />
+              )}
               <button
                 type="button"
                 onClick={submitMemo}
@@ -1788,6 +1820,7 @@ function turnsToDisplay(
       role: "assistant",
       text,
       created_at: t.created_at ?? fallbackCreatedAt,
+      usage: t.usage,
     };
   });
 }
@@ -1795,6 +1828,7 @@ function turnsToDisplay(
 type SseHandlers = {
   onMeta?: (conversationId: string, selectionId?: string) => void;
   onDelta: (chunk: string) => void;
+  onUsage?: (usage: TurnUsage) => void;
   onError?: (message: string) => void;
 };
 
@@ -1828,11 +1862,14 @@ async function consumeSseInto(resp: Response, handlers: SseHandlers) {
               conversationId: string;
               selectionId?: string;
             }
+          | { type: "usage"; usage: TurnUsage }
           | { type: "done" }
           | { type: "error"; message: string };
         if (payload.type === "delta") handlers.onDelta(payload.text);
         else if (payload.type === "meta")
           handlers.onMeta?.(payload.conversationId, payload.selectionId);
+        else if (payload.type === "usage")
+          handlers.onUsage?.(payload.usage);
         else if (payload.type === "error")
           handlers.onError?.(payload.message);
         else if (payload.type === "done") return;

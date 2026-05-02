@@ -4,6 +4,7 @@ import {
   type ContentBlock,
   type Conversation,
   type Turn,
+  type TurnUsage,
   appendMessages,
   findConversationBookId,
   getConversation,
@@ -159,6 +160,7 @@ export async function POST(
 
       let assistantText = "";
       let sessionId = conv.session_id;
+      let assistantUsage: TurnUsage | undefined;
       try {
         for await (const ev of askClaude({
           content: followupContent,
@@ -172,6 +174,9 @@ export async function POST(
           } else if (ev.kind === "delta") {
             assistantText += ev.text;
             controller.enqueue(sseFrame({ type: "delta", text: ev.text }));
+          } else if (ev.kind === "usage") {
+            assistantUsage = ev.usage;
+            controller.enqueue(sseFrame({ type: "usage", usage: ev.usage }));
           } else if (ev.kind === "error") {
             controller.enqueue(sseFrame({ type: "error", message: ev.message }));
           } else if (ev.kind === "done") {
@@ -188,14 +193,13 @@ export async function POST(
         if (turnReferencedIds.length > 0) {
           userTurn.referenced_thread_ids = turnReferencedIds;
         }
-        await appendMessages(bookId, conv.id, [
-          userTurn,
-          {
-            role: "assistant",
-            content: [{ type: "text", text: assistantText }],
-            created_at: Date.now(),
-          },
-        ]);
+        const assistantTurn: Turn = {
+          role: "assistant",
+          content: [{ type: "text", text: assistantText }],
+          created_at: Date.now(),
+          ...(assistantUsage ? { usage: assistantUsage } : {}),
+        };
+        await appendMessages(bookId, conv.id, [userTurn, assistantTurn]);
         if (sessionId && sessionId !== conv.session_id) {
           const fresh = (await getConversation(
             bookId,

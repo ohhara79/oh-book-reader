@@ -1,7 +1,10 @@
+import type { TurnUsage } from "./claude";
+
 export type SsePayload =
   | { type: "delta"; text: string }
   | { type: "session"; sessionId: string }
   | { type: "meta"; conversationId: string; selectionId?: string }
+  | { type: "usage"; usage: TurnUsage }
   | { type: "done" }
   | { type: "error"; message: string };
 

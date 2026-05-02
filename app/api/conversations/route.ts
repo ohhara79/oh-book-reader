@@ -4,6 +4,7 @@ import {
   type Selection,
   type SelectionSpan,
   type Turn,
+  type TurnUsage,
   newConversationId,
   newSelectionId,
   saveSelection,
@@ -154,6 +155,7 @@ export async function POST(req: NextRequest) {
 
       let assistantText = "";
       let sessionId: string | undefined;
+      let assistantUsage: TurnUsage | undefined;
       try {
         for await (const ev of askClaude({ content: firstUserContent })) {
           if (ev.kind === "session") {
@@ -164,6 +166,9 @@ export async function POST(req: NextRequest) {
           } else if (ev.kind === "delta") {
             assistantText += ev.text;
             controller.enqueue(sseFrame({ type: "delta", text: ev.text }));
+          } else if (ev.kind === "usage") {
+            assistantUsage = ev.usage;
+            controller.enqueue(sseFrame({ type: "usage", usage: ev.usage }));
           } else if (ev.kind === "error") {
             controller.enqueue(sseFrame({ type: "error", message: ev.message }));
           } else if (ev.kind === "done") {
@@ -180,13 +185,15 @@ export async function POST(req: NextRequest) {
         if (referencedThreadIds.length > 0) {
           userTurn.referenced_thread_ids = referencedThreadIds;
         }
+        const assistantTurn: Turn = {
+          role: "assistant",
+          content: [{ type: "text", text: assistantText }],
+          created_at: Date.now(),
+          ...(assistantUsage ? { usage: assistantUsage } : {}),
+        };
         await appendMessages(body.bookId, conversation.id, [
           userTurn,
-          {
-            role: "assistant",
-            content: [{ type: "text", text: assistantText }],
-            created_at: Date.now(),
-          },
+          assistantTurn,
         ]);
         if (sessionId) {
           const conv = await import("@/lib/store").then((m) =>

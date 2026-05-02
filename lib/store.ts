@@ -5,12 +5,14 @@ import type {
   Attachment,
   ImageAttachmentMediaType,
 } from "./attachments";
+import type { TurnUsage } from "./claude";
 
 export type {
   Attachment,
   AttachmentMediaType,
   ImageAttachmentMediaType,
 } from "./attachments";
+export type { TurnUsage } from "./claude";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const BOOKS_DIR = path.join(DATA_DIR, "books");
@@ -34,7 +36,12 @@ export type Turn =
       referenced_thread_ids?: string[];
       created_at?: number;
     }
-  | { role: "assistant"; content: ContentBlock[]; created_at?: number }
+  | {
+      role: "assistant";
+      content: ContentBlock[];
+      created_at?: number;
+      usage?: TurnUsage;
+    }
   | {
       role: "memo";
       text: string;

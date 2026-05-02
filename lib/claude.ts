@@ -14,8 +14,10 @@ excerpt. Quote precisely from the selected text when relevant. When the question
 involves math, render math in LaTeX using $...$ for inline math and $$...$$ for
 display math. Be concise.`;
 
+import { MODEL_NAME } from "./contextWindows";
+
 const BASE_OPTIONS: Options = {
-  model: "claude-sonnet-4-6",
+  model: MODEL_NAME,
   systemPrompt: SYSTEM_PROMPT,
   includePartialMessages: true,
   permissionMode: "dontAsk",
@@ -35,9 +37,17 @@ export type AskParams = {
   resumeSessionId?: string;
 };
 
+export type TurnUsage = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+};
+
 export type AskEvent =
   | { kind: "session"; sessionId: string }
   | { kind: "delta"; text: string }
+  | { kind: "usage"; usage: TurnUsage }
   | { kind: "done"; fullText: string }
   | { kind: "error"; message: string };
 
@@ -92,6 +102,12 @@ export async function* askClaude({
           subtype?: string;
           is_error?: boolean;
           result?: string;
+          usage?: {
+            input_tokens?: number;
+            output_tokens?: number;
+            cache_creation_input_tokens?: number;
+            cache_read_input_tokens?: number;
+          };
         };
         if (r.subtype === "error_max_turns" || r.is_error) {
           yield {
@@ -107,6 +123,18 @@ export async function* askClaude({
         if (!assembled && typeof r.result === "string") {
           assembled = r.result;
           yield { kind: "delta", text: r.result };
+        }
+        if (r.usage) {
+          yield {
+            kind: "usage",
+            usage: {
+              input_tokens: r.usage.input_tokens ?? 0,
+              output_tokens: r.usage.output_tokens ?? 0,
+              cache_creation_input_tokens:
+                r.usage.cache_creation_input_tokens ?? 0,
+              cache_read_input_tokens: r.usage.cache_read_input_tokens ?? 0,
+            },
+          };
         }
         yield { kind: "done", fullText: assembled };
         return;

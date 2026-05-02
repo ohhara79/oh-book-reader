@@ -582,7 +582,12 @@ export default function Reader({ bookId }: { bookId: string }) {
           </span>
           <button
             type="button"
-            onClick={() => setSidebarHidden((h) => !h)}
+            onClick={() => {
+              setSidebarHidden((h) => {
+                if (!h) setActive(null);
+                return !h;
+              });
+            }}
             className="ml-3 hidden rounded border px-2 py-1 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:text-zinc-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             aria-label={sidebarHidden ? "Show conversation panel" : "Hide conversation panel"}
             title={sidebarHidden ? "Show panel" : "Hide panel"}

@@ -2,10 +2,11 @@
 
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
-const remarkPlugins = [remarkMath];
+const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];
 
 function MathMarkdown({ text }: { text: string }) {

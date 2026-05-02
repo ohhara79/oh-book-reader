@@ -145,6 +145,46 @@ export default function Library() {
                   </span>
                   <button
                     type="button"
+                    onClick={() => onDelete(b)}
+                    disabled={isDeleting}
+                    title={isDeleting ? "Deleting…" : "Delete"}
+                    aria-label={isDeleting ? "Deleting…" : "Delete"}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    {isDeleting ? (
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        className="animate-spin"
+                        aria-hidden="true"
+                      >
+                        <path d="M14 8a6 6 0 1 1-6-6" />
+                      </svg>
+                    ) : (
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M3 5h10" />
+                        <path d="M6 5V3.5A1 1 0 0 1 7 3h2a1 1 0 0 1 1 1V5" />
+                        <path d="M5 5l1 8a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-8" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onDownload(b)}
                     disabled={isDownloading}
                     title={
@@ -184,46 +224,6 @@ export default function Library() {
                         <path d="M8 2v8" />
                         <path d="M4.5 7.5L8 11l3.5-3.5" />
                         <path d="M3 13h10" />
-                      </svg>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(b)}
-                    disabled={isDeleting}
-                    title={isDeleting ? "Deleting…" : "Delete"}
-                    aria-label={isDeleting ? "Deleting…" : "Delete"}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    {isDeleting ? (
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        className="animate-spin"
-                        aria-hidden="true"
-                      >
-                        <path d="M14 8a6 6 0 1 1-6-6" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 5h10" />
-                        <path d="M6 5V3.5A1 1 0 0 1 7 3h2a1 1 0 0 1 1 1V5" />
-                        <path d="M5 5l1 8a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-8" />
                       </svg>
                     )}
                   </button>

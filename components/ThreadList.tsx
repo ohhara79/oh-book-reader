@@ -190,18 +190,7 @@ export default function ThreadList({
       {visibleRows.length === 0 ? (
         <div className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700">
           {filter === "page" ? (
-            <>
-              <p>No threads on page {currentPage}.</p>
-              {allRows.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilter("all")}
-                  className="mt-1 text-xs text-zinc-700 underline hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-                >
-                  View all threads
-                </button>
-              )}
-            </>
+            <p>No threads on page {currentPage}.</p>
           ) : (
             <p>No threads yet.</p>
           )}

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import {
-  type AttachedImage,
+  type Attachment,
   type ContentBlock,
   type Conversation,
   type Turn,
@@ -13,7 +13,7 @@ import {
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 import {
-  attachmentImageBlocks,
+  attachmentBlocks as buildAttachmentBlocks,
   buildMemoBlocks,
   buildQuestionBlock,
   buildSelectionBlocks,
@@ -33,7 +33,7 @@ type Body = {
 
 type UnsentMemo = {
   text: string;
-  attachments?: AttachedImage[];
+  attachments?: Attachment[];
   referencedThreadIds?: string[];
 };
 
@@ -110,7 +110,7 @@ export async function POST(
   const memos = unsentMemos(conv.messages);
   const memoBlocks = buildMemoBlocks(memos);
   const questionBlock = buildQuestionBlock(body.question);
-  const attachmentBlocks = attachmentImageBlocks(attachments);
+  const attachmentBlocks = buildAttachmentBlocks(attachments);
 
   const aggregatedRefIds: string[] = [];
   const seenRefIds = new Set<string>([conversationId]);

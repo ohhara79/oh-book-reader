@@ -7,11 +7,14 @@ import CopyButton from "./CopyButton";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 import type { Conversation, Turn } from "@/lib/store";
 import {
-  type AttachedImage,
-  ATTACHMENT_MEDIA_TYPES,
+  type Attachment,
+  IMAGE_ATTACHMENT_MEDIA_TYPES,
   MAX_ATTACHMENTS_PER_TURN,
   MAX_ATTACHMENT_BYTES,
-  isAttachmentMediaType,
+  MAX_TEXT_ATTACHMENT_CHARS,
+  isImageAttachment,
+  isImageMediaType,
+  isTextMediaType,
 } from "@/lib/attachments";
 import {
   MAX_REFERENCED_THREADS_PER_TURN,
@@ -31,7 +34,14 @@ import ThreadList, {
   type ThreadListSelection,
 } from "./ThreadList";
 
-const ATTACHMENT_ACCEPT = ATTACHMENT_MEDIA_TYPES.join(",");
+const ATTACHMENT_ACCEPT = [
+  ...IMAGE_ATTACHMENT_MEDIA_TYPES,
+  "text/*",
+  ".md",
+  ".markdown",
+  ".txt",
+  ".text",
+].join(",");
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -39,23 +49,48 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function fileToAttachment(file: File): Promise<AttachedImage> {
-  return new Promise((resolve, reject) => {
-    const mediaType = file.type;
-    if (!isAttachmentMediaType(mediaType)) {
-      reject(new Error(`unsupported file type: ${mediaType || "unknown"}`));
-      return;
-    }
+function inferTextMediaType(file: File): string | null {
+  if (isTextMediaType(file.type)) return file.type;
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".md") || name.endsWith(".markdown")) {
+    return "text/markdown";
+  }
+  if (name.endsWith(".txt") || name.endsWith(".text")) {
+    return "text/plain";
+  }
+  return null;
+}
+
+async function fileToAttachment(file: File): Promise<Attachment> {
+  if (isImageMediaType(file.type)) {
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      reject(
-        new Error(
-          `file too large (${formatBytes(file.size)}; max ${formatBytes(
-            MAX_ATTACHMENT_BYTES,
-          )})`,
-        ),
+      throw new Error(
+        `file too large (${formatBytes(file.size)}; max ${formatBytes(
+          MAX_ATTACHMENT_BYTES,
+        )})`,
       );
-      return;
     }
+    const data = await readFileAsBase64(file);
+    if (!data) throw new Error("empty file");
+    return { media_type: file.type, data };
+  }
+  const textMedia = inferTextMediaType(file);
+  if (textMedia) {
+    const text = await file.text();
+    if (text.length > MAX_TEXT_ATTACHMENT_CHARS) {
+      throw new Error(
+        `text file too large (${formatBytes(
+          text.length,
+        )}; max ${formatBytes(MAX_TEXT_ATTACHMENT_CHARS)})`,
+      );
+    }
+    return { media_type: textMedia, data: text, name: file.name };
+  }
+  throw new Error(`unsupported file type: ${file.type || file.name}`);
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error ?? new Error("read failed"));
     reader.onload = () => {
@@ -65,12 +100,7 @@ function fileToAttachment(file: File): Promise<AttachedImage> {
         return;
       }
       const comma = result.indexOf(",");
-      const data = comma >= 0 ? result.slice(comma + 1) : "";
-      if (!data) {
-        reject(new Error("empty file"));
-        return;
-      }
-      resolve({ media_type: mediaType, data });
+      resolve(comma >= 0 ? result.slice(comma + 1) : "");
     };
     reader.readAsDataURL(file);
   });
@@ -109,7 +139,7 @@ type DisplayMessage =
   | {
       role: "user";
       text: string;
-      attachments?: AttachedImage[];
+      attachments?: Attachment[];
       referencedThreadIds?: string[];
       created_at?: number;
     }
@@ -121,7 +151,7 @@ type DisplayMessage =
   | {
       role: "memo";
       text: string;
-      attachments?: AttachedImage[];
+      attachments?: Attachment[];
       referencedThreadIds?: string[];
       created_at: number;
     };
@@ -145,7 +175,7 @@ export default function ConversationPanel({
   const [existingCapture, setExistingCapture] =
     useState<CapturedSelection | null>(null);
   const [question, setQuestion] = useState("");
-  const [attachments, setAttachments] = useState<AttachedImage[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [referencedThreads, setReferencedThreads] = useState<
     ReferencedThread[]
   >([]);
@@ -178,7 +208,7 @@ export default function ConversationPanel({
       setError(`max ${MAX_ATTACHMENTS_PER_TURN} attachments`);
       return;
     }
-    const accepted: AttachedImage[] = [];
+    const accepted: Attachment[] = [];
     let firstError: string | null = null;
     for (const file of files.slice(0, room)) {
       try {
@@ -355,7 +385,7 @@ export default function ConversationPanel({
   async function startNewConversationAsk(
     cap: CapturedSelection,
     q: string,
-    atts: AttachedImage[],
+    atts: Attachment[],
     refIds: string[],
   ) {
     setStreaming(true);
@@ -420,7 +450,7 @@ export default function ConversationPanel({
   async function startNewConversationMemo(
     cap: CapturedSelection,
     text: string,
-    atts: AttachedImage[],
+    atts: Attachment[],
     refIds: string[],
   ) {
     setPosting(true);
@@ -472,7 +502,7 @@ export default function ConversationPanel({
 
   async function appendMemoToExisting(
     text: string,
-    atts: AttachedImage[],
+    atts: Attachment[],
     refIds: string[],
   ) {
     if (!conversationId) return;
@@ -513,7 +543,7 @@ export default function ConversationPanel({
 
   async function sendFollowup(
     q: string,
-    atts: AttachedImage[],
+    atts: Attachment[],
     refIds: string[],
   ) {
     if (!conversationId) return;
@@ -1002,7 +1032,7 @@ export default function ConversationPanel({
             onChange={(e) => setQuestion(e.target.value)}
             disabled={busy}
             rows={3}
-            placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images."
+            placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images and text files."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -1042,12 +1072,39 @@ export default function ConversationPanel({
                   key={i}
                   className="relative rounded border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`data:${a.media_type};base64,${a.data}`}
-                    alt={`attachment ${i + 1}`}
-                    className="h-16 w-16 rounded object-cover"
-                  />
+                  {isImageAttachment(a) ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={`data:${a.media_type};base64,${a.data}`}
+                      alt={`attachment ${i + 1}`}
+                      className="h-16 w-16 rounded object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-16 w-32 items-center gap-1.5 rounded px-2 text-xs text-zinc-700 dark:text-zinc-300"
+                      title={a.name ?? "text attachment"}
+                    >
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className="shrink-0 text-zinc-500"
+                      >
+                        <path d="M4 1.5h5L13 5.5V14a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5z" />
+                        <path d="M9 1.5V5h4" />
+                        <path d="M5.5 8h5" />
+                        <path d="M5.5 10.5h5" />
+                        <path d="M5.5 13h3" />
+                      </svg>
+                      <span className="truncate font-mono">{a.name}</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeAttachment(i)}
@@ -1201,9 +1258,9 @@ export default function ConversationPanel({
                 title={
                   attachments.length >= MAX_ATTACHMENTS_PER_TURN
                     ? `Max ${MAX_ATTACHMENTS_PER_TURN} attachments`
-                    : "Attach images"
+                    : "Attach images or text files"
                 }
-                aria-label="Attach images"
+                aria-label="Attach files"
                 className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100"
               >
                 <svg
@@ -1394,19 +1451,116 @@ function ZoomableImage({
   );
 }
 
-function AttachmentStrip({ attachments }: { attachments: AttachedImage[] }) {
+function AttachmentStrip({ attachments }: { attachments: Attachment[] }) {
   if (attachments.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-2">
-      {attachments.map((a, i) => (
-        <ZoomableImage
-          key={i}
-          src={`data:${a.media_type};base64,${a.data}`}
-          alt={`attachment ${i + 1}`}
-          className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
-        />
-      ))}
+      {attachments.map((a, i) =>
+        isImageAttachment(a) ? (
+          <ZoomableImage
+            key={i}
+            src={`data:${a.media_type};base64,${a.data}`}
+            alt={`attachment ${i + 1}`}
+            className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
+          />
+        ) : (
+          <TextAttachmentChip
+            key={i}
+            name={a.name ?? "untitled"}
+            content={a.data}
+          />
+        ),
+      )}
     </div>
+  );
+}
+
+function TextAttachmentChip({
+  name,
+  content,
+}: {
+  name: string;
+  content: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title={`Open ${name}`}
+        className="inline-flex max-w-[18rem] items-center gap-1.5 rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      >
+        <svg
+          viewBox="0 0 16 16"
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="shrink-0 text-zinc-500"
+        >
+          <path d="M4 1.5h5L13 5.5V14a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5z" />
+          <path d="M9 1.5V5h4" />
+          <path d="M5.5 8h5" />
+          <path d="M5.5 10.5h5" />
+          <path d="M5.5 13h3" />
+        </svg>
+        <span className="truncate font-mono">{name}</span>
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 overflow-auto bg-black/80 backdrop-blur-sm print:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${name} preview`}
+        >
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close preview"
+            className="fixed right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-lg leading-none text-zinc-900 shadow hover:bg-white"
+          >
+            ×
+          </button>
+          <div
+            className="flex min-h-full min-w-full items-start justify-center p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full max-w-3xl rounded border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+              <div className="border-b border-zinc-200 px-3 py-2 font-mono text-xs text-zinc-700 dark:border-zinc-700 dark:text-zinc-200">
+                {name}
+              </div>
+              <pre className="max-h-[80vh] overflow-auto whitespace-pre-wrap break-words p-3 text-xs text-zinc-900 dark:text-zinc-100">
+                {content}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

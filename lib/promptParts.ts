@@ -1,8 +1,14 @@
-import type { AttachedImage, ContentBlock } from "./store";
+import {
+  isImageMediaType,
+  isTextAttachment,
+  type Attachment,
+} from "./attachments";
+import type { ContentBlock } from "./store";
 
 export {
   MAX_ATTACHMENTS_PER_TURN,
   MAX_ATTACHMENT_BASE64_CHARS,
+  MAX_TEXT_ATTACHMENT_CHARS,
   validateAttachments,
 } from "./attachments";
 
@@ -14,18 +20,36 @@ export type PromptSpan = {
   surroundingText?: string;
 };
 
-export function attachmentImageBlocks(
-  attachments: AttachedImage[] | undefined,
+function escapeAttrQuote(s: string): string {
+  return s.replace(/"/g, "&quot;");
+}
+
+export function attachmentBlocks(
+  attachments: Attachment[] | undefined,
 ): ContentBlock[] {
   if (!attachments || attachments.length === 0) return [];
-  return attachments.map((a) => ({
-    type: "image" as const,
-    source: {
-      type: "base64" as const,
-      media_type: a.media_type,
-      data: a.data,
-    },
-  }));
+  return attachments.map((a): ContentBlock => {
+    if (isTextAttachment(a)) {
+      const name = escapeAttrQuote(a.name ?? "untitled");
+      return {
+        type: "text",
+        text: `<document name="${name}">\n${a.data}\n</document>`,
+      };
+    }
+    if (!isImageMediaType(a.media_type)) {
+      // Validator should have rejected anything that's neither image nor text.
+      // Skip defensively.
+      return { type: "text", text: "" };
+    }
+    return {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: a.media_type,
+        data: a.data,
+      },
+    };
+  });
 }
 
 export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
@@ -96,12 +120,12 @@ export function buildQuestionBlock(question: string): ContentBlock {
 }
 
 export function buildMemoBlocks(
-  memos: { text: string; attachments?: AttachedImage[] }[],
+  memos: { text: string; attachments?: Attachment[] }[],
 ): ContentBlock[] {
   const out: ContentBlock[] = [];
   for (const m of memos) {
     out.push({ type: "text", text: `User memo:\n${m.text}` });
-    out.push(...attachmentImageBlocks(m.attachments));
+    out.push(...attachmentBlocks(m.attachments));
   }
   return out;
 }
@@ -109,13 +133,13 @@ export function buildMemoBlocks(
 export function buildFirstUserContent(
   spans: PromptSpan[],
   question: string,
-  attachments?: AttachedImage[],
+  attachments?: Attachment[],
   referencedThreadBlocks?: ContentBlock[],
 ): ContentBlock[] {
   return [
     ...(referencedThreadBlocks ?? []),
     ...buildSelectionBlocks(spans),
     buildQuestionBlock(question),
-    ...attachmentImageBlocks(attachments),
+    ...attachmentBlocks(attachments),
   ];
 }

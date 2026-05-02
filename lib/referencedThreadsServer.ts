@@ -8,7 +8,7 @@ import {
   getSelection,
   readSelectionImage,
 } from "./store";
-import { attachmentImageBlocks, buildSelectionBlocks } from "./promptParts";
+import { attachmentBlocks, buildSelectionBlocks } from "./promptParts";
 import { extractUserQuestion } from "./exportConversation";
 
 function pageRangeLabel(pages: number[]): string {
@@ -85,11 +85,11 @@ async function blocksForOneThread(
   for (const t of conv.messages) {
     if (t.role === "memo") {
       out.push({ type: "text", text: `Memo:\n${t.text}` });
-      out.push(...attachmentImageBlocks(t.attachments));
+      out.push(...attachmentBlocks(t.attachments));
     } else if (t.role === "user") {
       const text = turnTextForReference(t);
       if (text) out.push({ type: "text", text: `Question: ${text}` });
-      out.push(...attachmentImageBlocks(t.attachments));
+      out.push(...attachmentBlocks(t.attachments));
     } else {
       const text = turnTextForReference(t);
       if (text) out.push({ type: "text", text: `Answer: ${text}` });

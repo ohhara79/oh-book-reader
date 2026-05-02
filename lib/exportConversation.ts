@@ -1,6 +1,7 @@
 import type { Conversation, Turn } from "./store";
 import type { CapturedSelection } from "@/components/SelectionOverlay";
 import { formatTimestamp } from "./formatTimestamp";
+import { isImageAttachment } from "./attachments";
 
 export function extractUserQuestion(text: string): string {
   const m = text.match(/Question:\s*([\s\S]*)$/);
@@ -44,13 +45,41 @@ export function selectionSection(capture: CapturedSelection | null): string {
   return lines.join("\n");
 }
 
+function fenceFor(content: string): string {
+  let longest = 0;
+  let run = 0;
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "`") {
+      run++;
+      if (run > longest) longest = run;
+    } else {
+      run = 0;
+    }
+  }
+  return "`".repeat(Math.max(3, longest + 1));
+}
+
 function attachmentMarkdown(t: Turn): string {
   if (t.role === "assistant") return "";
   const atts = t.attachments;
   if (!atts || atts.length === 0) return "";
   const lines: string[] = [""];
   atts.forEach((a, i) => {
-    lines.push(`![attachment ${i + 1}](data:${a.media_type};base64,${a.data})`);
+    if (isImageAttachment(a)) {
+      lines.push(
+        `![attachment ${i + 1}](data:${a.media_type};base64,${a.data})`,
+      );
+      lines.push("");
+      return;
+    }
+    const name = a.name ?? `attachment-${i + 1}`;
+    const lang = a.media_type === "text/markdown" ? "markdown" : "text";
+    const fence = fenceFor(a.data);
+    lines.push(`#### Attachment: ${name}`);
+    lines.push("");
+    lines.push(`${fence}${lang}`);
+    lines.push(a.data);
+    lines.push(fence);
     lines.push("");
   });
   return lines.join("\n");

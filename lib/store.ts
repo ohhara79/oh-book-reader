@@ -1,9 +1,16 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { ulid } from "ulid";
-import type { AttachedImage, AttachmentMediaType } from "./attachments";
+import type {
+  Attachment,
+  ImageAttachmentMediaType,
+} from "./attachments";
 
-export type { AttachedImage, AttachmentMediaType } from "./attachments";
+export type {
+  Attachment,
+  AttachmentMediaType,
+  ImageAttachmentMediaType,
+} from "./attachments";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const BOOKS_DIR = path.join(DATA_DIR, "books");
@@ -14,7 +21,7 @@ export type ContentBlock =
       type: "image";
       source: {
         type: "base64";
-        media_type: AttachmentMediaType;
+        media_type: ImageAttachmentMediaType;
         data: string;
       };
     };
@@ -23,7 +30,7 @@ export type Turn =
   | {
       role: "user";
       content: ContentBlock[];
-      attachments?: AttachedImage[];
+      attachments?: Attachment[];
       referenced_thread_ids?: string[];
       created_at?: number;
     }
@@ -31,7 +38,7 @@ export type Turn =
   | {
       role: "memo";
       text: string;
-      attachments?: AttachedImage[];
+      attachments?: Attachment[];
       referenced_thread_ids?: string[];
       created_at: number;
     };
@@ -335,7 +342,7 @@ export async function appendMemoTurn(
   bookId: string,
   conversationId: string,
   text: string,
-  attachments?: AttachedImage[],
+  attachments?: Attachment[],
   referencedThreadIds?: string[],
 ): Promise<Conversation> {
   const conv = await getConversation(bookId, conversationId);

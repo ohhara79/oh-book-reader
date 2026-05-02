@@ -735,7 +735,19 @@ export default function Reader({ bookId }: { bookId: string }) {
               className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
               aria-label="Zoom out"
             >
-              −
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 8 L12 8" />
+              </svg>
             </button>
             <span className="hidden text-center md:inline-block md:w-12">
               {Math.round(scale * 100)}%
@@ -748,7 +760,20 @@ export default function Reader({ bookId }: { bookId: string }) {
               className="rounded border px-3 py-2 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
               aria-label="Zoom in"
             >
-              +
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 8 L12 8" />
+                <path d="M8 4 L8 12" />
+              </svg>
             </button>
           </span>
           <button

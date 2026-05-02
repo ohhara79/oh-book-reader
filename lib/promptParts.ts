@@ -1,4 +1,10 @@
-import type { ContentBlock } from "./store";
+import type { AttachedImage, ContentBlock } from "./store";
+
+export {
+  MAX_ATTACHMENTS_PER_TURN,
+  MAX_ATTACHMENT_BASE64_CHARS,
+  validateAttachments,
+} from "./attachments";
 
 export type PromptSpan = {
   page: number;
@@ -7,6 +13,20 @@ export type PromptSpan = {
   selectionText?: string;
   surroundingText?: string;
 };
+
+export function attachmentImageBlocks(
+  attachments: AttachedImage[] | undefined,
+): ContentBlock[] {
+  if (!attachments || attachments.length === 0) return [];
+  return attachments.map((a) => ({
+    type: "image" as const,
+    source: {
+      type: "base64" as const,
+      media_type: a.media_type,
+      data: a.data,
+    },
+  }));
+}
 
 export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
   if (spans.length === 0) return [];
@@ -76,17 +96,24 @@ export function buildQuestionBlock(question: string): ContentBlock {
 }
 
 export function buildMemoBlocks(
-  memos: { text: string }[],
+  memos: { text: string; attachments?: AttachedImage[] }[],
 ): ContentBlock[] {
-  return memos.map((m) => ({
-    type: "text" as const,
-    text: `User memo:\n${m.text}`,
-  }));
+  const out: ContentBlock[] = [];
+  for (const m of memos) {
+    out.push({ type: "text", text: `User memo:\n${m.text}` });
+    out.push(...attachmentImageBlocks(m.attachments));
+  }
+  return out;
 }
 
 export function buildFirstUserContent(
   spans: PromptSpan[],
   question: string,
+  attachments?: AttachedImage[],
 ): ContentBlock[] {
-  return [...buildSelectionBlocks(spans), buildQuestionBlock(question)];
+  return [
+    ...buildSelectionBlocks(spans),
+    buildQuestionBlock(question),
+    ...attachmentImageBlocks(attachments),
+  ];
 }

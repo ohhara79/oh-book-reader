@@ -44,15 +44,28 @@ export function selectionSection(capture: CapturedSelection | null): string {
   return lines.join("\n");
 }
 
+function attachmentMarkdown(t: Turn): string {
+  if (t.role === "assistant") return "";
+  const atts = t.attachments;
+  if (!atts || atts.length === 0) return "";
+  const lines: string[] = [""];
+  atts.forEach((a, i) => {
+    lines.push(`![attachment ${i + 1}](data:${a.media_type};base64,${a.data})`);
+    lines.push("");
+  });
+  return lines.join("\n");
+}
+
 function turnSection(t: Turn, fallbackTs: number): string {
   const ts = t.created_at ?? fallbackTs;
   const stamp = formatTimestamp(ts);
   const body = turnText(t).trim();
+  const tail = attachmentMarkdown(t);
   if (t.role === "memo") {
-    return `#### Memo · ${stamp}\n\n${body}\n`;
+    return `#### Memo · ${stamp}\n\n${body}${tail}\n`;
   }
   const heading = t.role === "user" ? "You" : "AI";
-  return `### ${heading} · ${stamp}\n\n${body}\n`;
+  return `### ${heading} · ${stamp}\n\n${body}${tail}\n`;
 }
 
 export function conversationToMarkdown(args: {

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import {
+  type AttachedImage,
   type ContentBlock,
   type Conversation,
   type Turn,
@@ -12,17 +13,21 @@ import {
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 import {
+  attachmentImageBlocks,
   buildMemoBlocks,
   buildQuestionBlock,
   buildSelectionBlocks,
   type PromptSpan,
+  validateAttachments,
 } from "@/lib/promptParts";
 
 export const runtime = "nodejs";
 
-type Body = { question: string };
+type Body = { question: string; attachments?: unknown };
 
-function unsentMemos(messages: Turn[]): { text: string }[] {
+function unsentMemos(
+  messages: Turn[],
+): { text: string; attachments?: AttachedImage[] }[] {
   let lastAssistant = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "assistant") {
@@ -30,10 +35,12 @@ function unsentMemos(messages: Turn[]): { text: string }[] {
       break;
     }
   }
-  const out: { text: string }[] = [];
+  const out: { text: string; attachments?: AttachedImage[] }[] = [];
   for (let i = lastAssistant + 1; i < messages.length; i++) {
     const t = messages[i];
-    if (t.role === "memo") out.push({ text: t.text });
+    if (t.role === "memo") {
+      out.push({ text: t.text, attachments: t.attachments });
+    }
   }
   return out;
 }
@@ -64,6 +71,12 @@ export async function POST(
   const body = (await req.json()) as Body;
   if (!body?.question) return new Response("bad request", { status: 400 });
 
+  const attachmentsResult = validateAttachments(body.attachments);
+  if ("error" in attachmentsResult) {
+    return new Response(attachmentsResult.error, { status: 400 });
+  }
+  const attachments = attachmentsResult;
+
   const bookId = await findConversationBookId(conversationId);
   if (!bookId) return new Response("not found", { status: 404 });
 
@@ -73,6 +86,7 @@ export async function POST(
 
   const memoBlocks = buildMemoBlocks(unsentMemos(conv.messages));
   const questionBlock = buildQuestionBlock(body.question);
+  const attachmentBlocks = attachmentImageBlocks(attachments);
 
   let followupContent: ContentBlock[];
   if (!conv.session_id) {
@@ -84,9 +98,10 @@ export async function POST(
       ...buildSelectionBlocks(promptSpans),
       ...memoBlocks,
       questionBlock,
+      ...attachmentBlocks,
     ];
   } else {
-    followupContent = [...memoBlocks, questionBlock];
+    followupContent = [...memoBlocks, questionBlock, ...attachmentBlocks];
   }
 
   const userCreatedAt = Date.now();
@@ -118,12 +133,14 @@ export async function POST(
           }
         }
 
+        const userTurn: Turn = {
+          role: "user",
+          content: followupContent,
+          created_at: userCreatedAt,
+        };
+        if (attachments.length > 0) userTurn.attachments = attachments;
         await appendMessages(bookId, conv.id, [
-          {
-            role: "user",
-            content: followupContent,
-            created_at: userCreatedAt,
-          },
+          userTurn,
           {
             role: "assistant",
             content: [{ type: "text", text: assistantText }],

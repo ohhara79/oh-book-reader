@@ -5,7 +5,14 @@ import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
 import { formatTimestamp } from "@/lib/formatTimestamp";
-import type { Conversation } from "@/lib/store";
+import type { Conversation, Turn } from "@/lib/store";
+import {
+  type AttachedImage,
+  ATTACHMENT_MEDIA_TYPES,
+  MAX_ATTACHMENTS_PER_TURN,
+  MAX_ATTACHMENT_BYTES,
+  isAttachmentMediaType,
+} from "@/lib/attachments";
 import {
   conversationToMarkdown,
   extractUserQuestion,
@@ -20,17 +27,50 @@ import ThreadList, {
   type ThreadListSelection,
 } from "./ThreadList";
 
-type Turn =
-  | { role: "user"; content: ContentBlock[]; created_at?: number }
-  | { role: "assistant"; content: ContentBlock[]; created_at?: number }
-  | { role: "memo"; text: string; created_at: number };
+const ATTACHMENT_ACCEPT = ATTACHMENT_MEDIA_TYPES.join(",");
 
-type ContentBlock =
-  | { type: "text"; text: string }
-  | {
-      type: "image";
-      source: { type: "base64"; media_type: string; data: string };
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileToAttachment(file: File): Promise<AttachedImage> {
+  return new Promise((resolve, reject) => {
+    const mediaType = file.type;
+    if (!isAttachmentMediaType(mediaType)) {
+      reject(new Error(`unsupported file type: ${mediaType || "unknown"}`));
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      reject(
+        new Error(
+          `file too large (${formatBytes(file.size)}; max ${formatBytes(
+            MAX_ATTACHMENT_BYTES,
+          )})`,
+        ),
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("unexpected reader result"));
+        return;
+      }
+      const comma = result.indexOf(",");
+      const data = comma >= 0 ? result.slice(comma + 1) : "";
+      if (!data) {
+        reject(new Error("empty file"));
+        return;
+      }
+      resolve({ media_type: mediaType, data });
     };
+    reader.readAsDataURL(file);
+  });
+}
 
 type ActiveConversation =
   | { kind: "new"; capture: CapturedSelection }
@@ -50,13 +90,20 @@ type Props = {
 
 type DisplayMessage =
   | {
-      role: "user" | "assistant";
+      role: "user";
+      text: string;
+      attachments?: AttachedImage[];
+      created_at?: number;
+    }
+  | {
+      role: "assistant";
       text: string;
       created_at?: number;
     }
   | {
       role: "memo";
       text: string;
+      attachments?: AttachedImage[];
       created_at: number;
     };
 
@@ -79,6 +126,8 @@ export default function ConversationPanel({
   const [existingCapture, setExistingCapture] =
     useState<CapturedSelection | null>(null);
   const [question, setQuestion] = useState("");
+  const [attachments, setAttachments] = useState<AttachedImage[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [posting, setPosting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -89,6 +138,7 @@ export default function ConversationPanel({
   const [savingTitle, setSavingTitle] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
   const titleComposingRef = useRef(false);
   const savingTitleRef = useRef(false);
@@ -96,11 +146,45 @@ export default function ConversationPanel({
     null,
   );
 
+  async function addFiles(files: File[]) {
+    if (files.length === 0) return;
+    const room = MAX_ATTACHMENTS_PER_TURN - attachments.length;
+    if (room <= 0) {
+      setError(`max ${MAX_ATTACHMENTS_PER_TURN} attachments`);
+      return;
+    }
+    const accepted: AttachedImage[] = [];
+    let firstError: string | null = null;
+    for (const file of files.slice(0, room)) {
+      try {
+        accepted.push(await fileToAttachment(file));
+      } catch (e) {
+        if (!firstError) {
+          firstError = e instanceof Error ? e.message : String(e);
+        }
+      }
+    }
+    if (files.length > room && !firstError) {
+      firstError = `max ${MAX_ATTACHMENTS_PER_TURN} attachments — extra files were dropped`;
+    }
+    if (firstError) setError(firstError);
+    else setError(null);
+    if (accepted.length > 0) {
+      setAttachments((prev) => [...prev, ...accepted]);
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
+
   // Reset / load when `active` changes (controlled by `key` from parent).
   useEffect(() => {
     setError(null);
     setMessages([]);
     setQuestion("");
+    setAttachments([]);
+    setDragActive(false);
     setConversationId(null);
     setRawConversation(null);
     setExistingCapture(null);
@@ -180,7 +264,11 @@ export default function ConversationPanel({
     }
   }
 
-  async function startNewConversationAsk(cap: CapturedSelection, q: string) {
+  async function startNewConversationAsk(
+    cap: CapturedSelection,
+    q: string,
+    atts: AttachedImage[],
+  ) {
     setStreaming(true);
     setError(null);
     const askedAt = Date.now();
@@ -189,6 +277,7 @@ export default function ConversationPanel({
       {
         role: "user",
         text: q,
+        attachments: atts.length > 0 ? atts : undefined,
         created_at: askedAt,
       },
       { role: "assistant", text: "" },
@@ -209,6 +298,7 @@ export default function ConversationPanel({
             surroundingText: s.surroundingText,
           })),
           question: q,
+          attachments: atts,
         }),
       });
       await consumeSseInto(r, {
@@ -236,13 +326,22 @@ export default function ConversationPanel({
     }
   }
 
-  async function startNewConversationMemo(cap: CapturedSelection, text: string) {
+  async function startNewConversationMemo(
+    cap: CapturedSelection,
+    text: string,
+    atts: AttachedImage[],
+  ) {
     setPosting(true);
     setError(null);
     const now = Date.now();
     setMessages((prev) => [
       ...prev,
-      { role: "memo", text, created_at: now },
+      {
+        role: "memo",
+        text,
+        attachments: atts.length > 0 ? atts : undefined,
+        created_at: now,
+      },
     ]);
     try {
       const r = await fetch("/api/conversations", {
@@ -260,6 +359,7 @@ export default function ConversationPanel({
             surroundingText: s.surroundingText,
           })),
           text,
+          attachments: atts,
         }),
       });
       if (!r.ok) {
@@ -276,20 +376,25 @@ export default function ConversationPanel({
     }
   }
 
-  async function appendMemoToExisting(text: string) {
+  async function appendMemoToExisting(text: string, atts: AttachedImage[]) {
     if (!conversationId) return;
     setPosting(true);
     setError(null);
     const now = Date.now();
     setMessages((prev) => [
       ...prev,
-      { role: "memo", text, created_at: now },
+      {
+        role: "memo",
+        text,
+        attachments: atts.length > 0 ? atts : undefined,
+        created_at: now,
+      },
     ]);
     try {
       const r = await fetch(`/api/conversations/${conversationId}/memos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, attachments: atts }),
       });
       if (!r.ok) {
         setError(`failed to save memo: ${r.status}`);
@@ -303,14 +408,19 @@ export default function ConversationPanel({
     }
   }
 
-  async function sendFollowup(q: string) {
+  async function sendFollowup(q: string, atts: AttachedImage[]) {
     if (!conversationId) return;
     setStreaming(true);
     setError(null);
     const askedAt = Date.now();
     setMessages((prev) => [
       ...prev,
-      { role: "user", text: q, created_at: askedAt },
+      {
+        role: "user",
+        text: q,
+        attachments: atts.length > 0 ? atts : undefined,
+        created_at: askedAt,
+      },
       { role: "assistant", text: "" },
     ]);
     try {
@@ -319,7 +429,7 @@ export default function ConversationPanel({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: q }),
+          body: JSON.stringify({ question: q, attachments: atts }),
         },
       );
       await consumeSseInto(r, {
@@ -433,24 +543,28 @@ export default function ConversationPanel({
   function submitAsk() {
     const q = question.trim();
     if (!q || streaming || posting) return;
+    const atts = attachments;
     setQuestion("");
+    setAttachments([]);
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversationAsk(active.capture, q);
+      void startNewConversationAsk(active.capture, q, atts);
     } else if (conversationId) {
-      void sendFollowup(q);
+      void sendFollowup(q, atts);
     }
   }
 
   function submitMemo() {
     const t = question.trim();
     if (!t || streaming || posting) return;
+    const atts = attachments;
     setQuestion("");
+    setAttachments([]);
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversationMemo(active.capture, t);
+      void startNewConversationMemo(active.capture, t, atts);
     } else if (conversationId) {
-      void appendMemoToExisting(t);
+      void appendMemoToExisting(t, atts);
     }
   }
 
@@ -738,14 +852,36 @@ export default function ConversationPanel({
       {active && (
         <form
           onSubmit={onAskSubmit}
-          className="border-t border-zinc-200 p-3 print:hidden dark:border-zinc-800"
+          onDragOver={(e) => {
+            if (
+              Array.from(e.dataTransfer.types ?? []).includes("Files")
+            ) {
+              e.preventDefault();
+              setDragActive(true);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget === e.target) setDragActive(false);
+          }}
+          onDrop={(e) => {
+            const files = Array.from(e.dataTransfer.files ?? []);
+            if (files.length === 0) return;
+            e.preventDefault();
+            setDragActive(false);
+            void addFiles(files);
+          }}
+          className={`border-t p-3 transition-colors print:hidden ${
+            dragActive
+              ? "border-zinc-400 bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900/60"
+              : "border-zinc-200 dark:border-zinc-800"
+          }`}
         >
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             disabled={busy}
             rows={3}
-            placeholder="Write a memo or ask a question. Markdown + math supported."
+            placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -753,7 +889,58 @@ export default function ConversationPanel({
                 submitAsk();
               }
             }}
+            onPaste={(e) => {
+              const files: File[] = [];
+              for (const item of Array.from(e.clipboardData.items)) {
+                if (item.kind === "file") {
+                  const f = item.getAsFile();
+                  if (f) files.push(f);
+                }
+              }
+              if (files.length > 0) {
+                e.preventDefault();
+                void addFiles(files);
+              }
+            }}
           />
+          {attachments.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {attachments.map((a, i) => (
+                <div
+                  key={i}
+                  className="relative rounded border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`data:${a.media_type};base64,${a.data}`}
+                    alt={`attachment ${i + 1}`}
+                    className="h-16 w-16 rounded object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    title="Remove attachment"
+                    aria-label={`Remove attachment ${i + 1}`}
+                    className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-600 shadow hover:text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="10"
+                      height="10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 4l8 8" />
+                      <path d="M12 4l-8 8" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           {deferredTrimmed && (
             <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
               <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
@@ -762,22 +949,62 @@ export default function ConversationPanel({
               <MathMarkdown text={deferredQuestion} />
             </div>
           )}
-          <div className="mt-2 flex justify-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ATTACHMENT_ACCEPT}
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) void addFiles(files);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          />
+          <div className="mt-2 flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={submitMemo}
-              disabled={busy || !trimmed}
-              className="rounded border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-3 md:py-1 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy || attachments.length >= MAX_ATTACHMENTS_PER_TURN}
+              title={
+                attachments.length >= MAX_ATTACHMENTS_PER_TURN
+                  ? `Max ${MAX_ATTACHMENTS_PER_TURN} attachments`
+                  : "Attach images"
+              }
+              aria-label="Attach images"
+              className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100"
             >
-              {posting ? "Saving…" : "Memo"}
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M11.5 6.5L6 12a2.5 2.5 0 1 1-3.5-3.5l6-6a4 4 0 0 1 5.5 5.5l-6 6" />
+              </svg>
             </button>
-            <button
-              type="submit"
-              disabled={busy || !trimmed}
-              className="rounded bg-zinc-900 px-4 py-2 text-sm text-white active:bg-zinc-700 disabled:opacity-50 md:px-3 md:py-1 dark:bg-zinc-100 dark:text-black dark:active:bg-zinc-300"
-            >
-              {streaming ? "Asking…" : "Ask"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={submitMemo}
+                disabled={busy || !trimmed}
+                className="rounded border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-3 md:py-1 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                {posting ? "Saving…" : "Memo"}
+              </button>
+              <button
+                type="submit"
+                disabled={busy || !trimmed}
+                className="rounded bg-zinc-900 px-4 py-2 text-sm text-white active:bg-zinc-700 disabled:opacity-50 md:px-3 md:py-1 dark:bg-zinc-100 dark:text-black dark:active:bg-zinc-300"
+              >
+                {streaming ? "Asking…" : "Ask"}
+              </button>
+            </div>
           </div>
         </form>
       )}
@@ -827,6 +1054,23 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
   );
 }
 
+function AttachmentStrip({ attachments }: { attachments: AttachedImage[] }) {
+  if (attachments.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {attachments.map((a, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={i}
+          src={`data:${a.media_type};base64,${a.data}`}
+          alt={`attachment ${i + 1}`}
+          className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
+        />
+      ))}
+    </div>
+  );
+}
+
 function MessageBubble({
   m,
   streaming,
@@ -844,6 +1088,9 @@ function MessageBubble({
           <CopyButton text={m.text} />
         </div>
         <MathMarkdown text={m.text} />
+        {m.attachments && (
+          <AttachmentStrip attachments={m.attachments} />
+        )}
       </div>
     );
   }
@@ -867,7 +1114,10 @@ function MessageBubble({
         <CopyButton text={m.text} />
       </div>
       {isUser ? (
-        <MathMarkdown text={m.text} />
+        <>
+          <MathMarkdown text={m.text} />
+          {m.attachments && <AttachmentStrip attachments={m.attachments} />}
+        </>
       ) : (
         <>
           <MathMarkdown text={m.text || (streaming ? "…" : "")} />
@@ -886,7 +1136,12 @@ function turnsToDisplay(
 ): DisplayMessage[] {
   return turns.map((t): DisplayMessage => {
     if (t.role === "memo") {
-      return { role: "memo", text: t.text, created_at: t.created_at };
+      return {
+        role: "memo",
+        text: t.text,
+        attachments: t.attachments,
+        created_at: t.created_at,
+      };
     }
     let text = "";
     for (const block of t.content) {
@@ -898,9 +1153,15 @@ function turnsToDisplay(
       // Strip our prompt-template prefixes so the UI only shows the user's
       // actual question. Shared with the markdown export.
       text = extractUserQuestion(text);
+      return {
+        role: "user",
+        text,
+        attachments: t.attachments,
+        created_at: t.created_at ?? fallbackCreatedAt,
+      };
     }
     return {
-      role: t.role,
+      role: "assistant",
       text,
       created_at: t.created_at ?? fallbackCreatedAt,
     };

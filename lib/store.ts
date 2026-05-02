@@ -1,6 +1,9 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { ulid } from "ulid";
+import type { AttachedImage, AttachmentMediaType } from "./attachments";
+
+export type { AttachedImage, AttachmentMediaType } from "./attachments";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const BOOKS_DIR = path.join(DATA_DIR, "books");
@@ -11,15 +14,25 @@ export type ContentBlock =
       type: "image";
       source: {
         type: "base64";
-        media_type: "image/png" | "image/jpeg";
+        media_type: AttachmentMediaType;
         data: string;
       };
     };
 
 export type Turn =
-  | { role: "user"; content: ContentBlock[]; created_at?: number }
+  | {
+      role: "user";
+      content: ContentBlock[];
+      attachments?: AttachedImage[];
+      created_at?: number;
+    }
   | { role: "assistant"; content: ContentBlock[]; created_at?: number }
-  | { role: "memo"; text: string; created_at: number };
+  | {
+      role: "memo";
+      text: string;
+      attachments?: AttachedImage[];
+      created_at: number;
+    };
 
 export type BookMeta = {
   id: string;
@@ -320,10 +333,13 @@ export async function appendMemoTurn(
   bookId: string,
   conversationId: string,
   text: string,
+  attachments?: AttachedImage[],
 ): Promise<Conversation> {
   const conv = await getConversation(bookId, conversationId);
   const now = Date.now();
-  conv.messages.push({ role: "memo", text, created_at: now });
+  const memo: Turn = { role: "memo", text, created_at: now };
+  if (attachments && attachments.length > 0) memo.attachments = attachments;
+  conv.messages.push(memo);
   conv.updated_at = now;
   await saveConversation(bookId, conv);
   return conv;

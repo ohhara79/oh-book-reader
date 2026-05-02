@@ -3,6 +3,7 @@ import {
   type Conversation,
   type Selection,
   type SelectionSpan,
+  type Turn,
   newConversationId,
   newSelectionId,
   saveSelection,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/store";
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
-import { buildFirstUserContent } from "@/lib/promptParts";
+import { buildFirstUserContent, validateAttachments } from "@/lib/promptParts";
 
 export const runtime = "nodejs";
 
@@ -30,12 +31,14 @@ type Body =
       spans: SpanInput[];
       kind?: "ask";
       question: string;
+      attachments?: unknown;
     }
   | {
       bookId: string;
       spans: SpanInput[];
       kind: "memo";
       text: string;
+      attachments?: unknown;
     };
 
 export async function POST(req: NextRequest) {
@@ -55,6 +58,12 @@ export async function POST(req: NextRequest) {
   if (kind === "memo" && !("text" in body && body.text)) {
     return new Response("bad request", { status: 400 });
   }
+
+  const attachmentsResult = validateAttachments(body.attachments);
+  if ("error" in attachmentsResult) {
+    return new Response(attachmentsResult.error, { status: 400 });
+  }
+  const attachments = attachmentsResult;
 
   const now = Date.now();
   const spans: SelectionSpan[] = body.spans.map((s) => ({
@@ -76,13 +85,19 @@ export async function POST(req: NextRequest) {
 
   if (kind === "memo") {
     const memoBody = body as Extract<Body, { kind: "memo" }>;
+    const memoTurn: Turn = {
+      role: "memo",
+      text: memoBody.text,
+      created_at: now,
+    };
+    if (attachments.length > 0) memoTurn.attachments = attachments;
     const conversation: Conversation = {
       id: newConversationId(),
       selection_id: selection.id,
       title: memoBody.text.slice(0, 80),
       created_at: now,
       updated_at: now,
-      messages: [{ role: "memo", text: memoBody.text, created_at: now }],
+      messages: [memoTurn],
     };
     await saveConversation(body.bookId, conversation);
     return Response.json({
@@ -92,7 +107,11 @@ export async function POST(req: NextRequest) {
   }
 
   const askBody = body as Extract<Body, { kind?: "ask" }>;
-  const firstUserContent = buildFirstUserContent(body.spans, askBody.question);
+  const firstUserContent = buildFirstUserContent(
+    body.spans,
+    askBody.question,
+    attachments,
+  );
 
   const conversation: Conversation = {
     id: newConversationId(),
@@ -133,8 +152,14 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        const userTurn: Turn = {
+          role: "user",
+          content: firstUserContent,
+          created_at: now,
+        };
+        if (attachments.length > 0) userTurn.attachments = attachments;
         await appendMessages(body.bookId, conversation.id, [
-          { role: "user", content: firstUserContent, created_at: now },
+          userTurn,
           {
             role: "assistant",
             content: [{ type: "text", text: assistantText }],

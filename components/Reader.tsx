@@ -668,6 +668,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={pageNum <= 1}
             aria-label="Previous page"
+            title="Previous page"
           >
             <svg
               viewBox="0 0 16 16"
@@ -711,6 +712,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={!!numPages && pageNum >= numPages}
             aria-label="Next page"
+            title="Next page"
           >
             <svg
               viewBox="0 0 16 16"
@@ -734,6 +736,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               }
               className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom out"
+              title="Zoom out"
             >
               <svg
                 viewBox="0 0 16 16"
@@ -759,6 +762,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               }
               className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom in"
+              title="Zoom in"
             >
               <svg
                 viewBox="0 0 16 16"

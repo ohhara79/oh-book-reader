@@ -179,21 +179,31 @@ export function ThreadListControls({
         <FilterButton
           active={filter === "page"}
           onClick={() => setFilter("page")}
+          title="Show threads on the current page"
         >
           This page
         </FilterButton>
         <FilterButton
           active={filter === "all"}
           onClick={() => setFilter("all")}
+          title="Show threads from every page"
         >
           All pages
         </FilterButton>
       </div>
       <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
-        <FilterButton active={sort === "date"} onClick={() => setSort("date")}>
+        <FilterButton
+          active={sort === "date"}
+          onClick={() => setSort("date")}
+          title="Sort by most recently updated"
+        >
           Date
         </FilterButton>
-        <FilterButton active={sort === "page"} onClick={() => setSort("page")}>
+        <FilterButton
+          active={sort === "page"}
+          onClick={() => setSort("page")}
+          title="Sort by page number"
+        >
           Page
         </FilterButton>
       </div>
@@ -260,16 +270,19 @@ export default function ThreadList({
 function FilterButton({
   active,
   onClick,
+  title,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       className={
         active
           ? "bg-zinc-900 px-2.5 py-1 text-white dark:bg-zinc-100 dark:text-black"

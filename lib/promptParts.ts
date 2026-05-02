@@ -24,6 +24,12 @@ function escapeAttrQuote(s: string): string {
   return s.replace(/"/g, "&quot;");
 }
 
+const DOCUMENT_BLOCK_RE = /^<document name="[^"]*">[\s\S]*<\/document>$/;
+
+export function isAttachmentDocumentBlock(block: ContentBlock): boolean {
+  return block.type === "text" && DOCUMENT_BLOCK_RE.test(block.text);
+}
+
 export function attachmentBlocks(
   attachments: Attachment[] | undefined,
 ): ContentBlock[] {

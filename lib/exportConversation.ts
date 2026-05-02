@@ -2,19 +2,20 @@ import type { Conversation, Turn } from "./store";
 import type { CapturedSelection } from "@/components/SelectionOverlay";
 import { formatTimestamp } from "./formatTimestamp";
 import { isImageAttachment } from "./attachments";
+import { isAttachmentDocumentBlock } from "./promptParts";
 
 export function extractUserQuestion(text: string): string {
   const m = text.match(/Question:\s*([\s\S]*)$/);
   return m ? m[1].trim() : text;
 }
 
-function turnText(t: Turn): string {
+export function userVisibleTurnText(t: Turn): string {
   if (t.role === "memo") return t.text;
   let text = "";
   for (const block of t.content) {
-    if (block.type === "text") {
-      text += (text ? "\n" : "") + block.text;
-    }
+    if (block.type !== "text") continue;
+    if (isAttachmentDocumentBlock(block)) continue;
+    text += (text ? "\n" : "") + block.text;
   }
   if (t.role === "user") text = extractUserQuestion(text);
   return text;
@@ -95,7 +96,7 @@ function referencedThreadsMarkdown(t: Turn): string {
 function turnSection(t: Turn, fallbackTs: number): string {
   const ts = t.created_at ?? fallbackTs;
   const stamp = formatTimestamp(ts);
-  const body = turnText(t).trim();
+  const body = userVisibleTurnText(t).trim();
   const tail = attachmentMarkdown(t);
   const refs = referencedThreadsMarkdown(t);
   if (t.role === "memo") {

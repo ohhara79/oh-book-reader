@@ -22,8 +22,8 @@ import {
 } from "@/lib/referencedThreads";
 import {
   conversationToMarkdown,
-  extractUserQuestion,
   selectionSection,
+  userVisibleTurnText,
 } from "@/lib/exportConversation";
 import {
   conversationFilename,
@@ -1692,16 +1692,8 @@ function turnsToDisplay(
         created_at: t.created_at,
       };
     }
-    let text = "";
-    for (const block of t.content) {
-      if (block.type === "text") {
-        text += (text ? "\n" : "") + block.text;
-      }
-    }
+    const text = userVisibleTurnText(t);
     if (t.role === "user") {
-      // Strip our prompt-template prefixes so the UI only shows the user's
-      // actual question. Shared with the markdown export.
-      text = extractUserQuestion(text);
       return {
         role: "user",
         text,

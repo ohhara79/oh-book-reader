@@ -206,6 +206,7 @@ export default function ConversationPanel({
   const [savingTitle, setSavingTitle] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
@@ -330,6 +331,7 @@ export default function ConversationPanel({
     titleComposingRef.current = false;
     savingTitleRef.current = false;
     stickToBottomRef.current = true;
+    lastScrollTopRef.current = 0;
     if (titleBlurTimeoutRef.current) {
       clearTimeout(titleBlurTimeoutRef.current);
       titleBlurTimeoutRef.current = null;
@@ -1015,9 +1017,15 @@ export default function ConversationPanel({
         ref={scrollerRef}
         onScroll={(e) => {
           const el = e.currentTarget;
+          const newScrollTop = el.scrollTop;
           const distanceFromBottom =
-            el.scrollHeight - el.scrollTop - el.clientHeight;
-          stickToBottomRef.current = distanceFromBottom <= 32;
+            el.scrollHeight - newScrollTop - el.clientHeight;
+          if (newScrollTop < lastScrollTopRef.current - 1) {
+            stickToBottomRef.current = false;
+          } else if (distanceFromBottom <= 32) {
+            stickToBottomRef.current = true;
+          }
+          lastScrollTopRef.current = newScrollTop;
         }}
         className="flex-1 overflow-auto px-4 py-3 print:overflow-visible"
       >

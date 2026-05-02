@@ -11,7 +11,7 @@ clicked.
 
 ## Root cause
 
-Two interacting issues, both in `components/ConversationPanel.tsx`:
+Three interacting issues:
 
 1. **Forced remount on every list ↔ detail transition.** `Reader.tsx:822-829`
    keys `<ConversationPanel>` by the active conversation id (or `"empty"` /
@@ -36,12 +36,23 @@ Two interacting issues, both in `components/ConversationPanel.tsx`:
    `isEmpty === true` (`ConversationPanel.tsx:976-998`). Result: the list view
    is animated to its bottom every time the panel remounts in empty state.
 
+3. **`useThreadListRows` hydrates filter/sort from localStorage in a
+   post-paint `useEffect`** (`ThreadList.tsx:65-80` originally). On the first
+   render of a fresh ConversationPanel mount, filter defaults to `"page"`, so
+   `visibleRows` is short (only threads on the current page) and
+   `scrollHeight` is small. Any layout-effect-based scroll restoration runs
+   against that short list, and the browser clamps the requested `scrollTop`
+   to ~0. After paint, the hydration effect switches filter to the persisted
+   value (e.g. `"all"`), the list grows tall — but it's too late, the
+   restoration window has passed.
+
 So closing a thread doesn't merely fail to restore position — it actively
-scrolls the user to the end of the list.
+scrolls the user to the end of the list. And a naive `useLayoutEffect` fix
+lands at the top because the list isn't its full height yet.
 
 ## Approach
 
-Two small, surgical changes:
+Three small, surgical changes:
 
 ### A) Stop the bottom-scroll effect from firing in list view
 
@@ -91,6 +102,43 @@ The capture point (just before opening a thread) and the restore point (mount
 in empty state) line up exactly with the open/close round-trip the user
 described.
 
+### C) Hydrate `useThreadListRows` synchronously
+
+In `components/ThreadList.tsx`, switch the filter/sort initialization from
+post-paint `useEffect` to lazy `useState` initializers that read
+`localStorage` directly. The book page is rendered with `ssr: false`
+(`app/books/[bookId]/page.tsx:6`), so `window` / `localStorage` are available
+during the initial render — no SSR/hydration mismatch risk.
+
+```ts
+const [filter, setFilter] = useState<FilterMode>(() => {
+  const stored = readThreadListState();
+  if (stored?.filter === "all" || stored?.filter === "page") {
+    return stored.filter;
+  }
+  return "page";
+});
+const [sort, setSort] = useState<SortMode>(() => {
+  const stored = readThreadListState();
+  if (stored?.sort === "date" || stored?.sort === "page") {
+    return stored.sort;
+  }
+  return "date";
+});
+
+useEffect(() => {
+  localStorage.setItem(THREAD_LIST_KEY, JSON.stringify({ filter, sort }));
+}, [filter, sort]);
+```
+
+The previous `hydrated` flag becomes unnecessary — the very first run of the
+write effect now persists the just-read values (idempotent for an existing
+user; for a brand-new user it persists the defaults, which is harmless).
+
+This makes `visibleRows` stable from render #1, so the layout effect in (B)
+runs against the full-height list and the requested `scrollTop` is no longer
+clamped to 0.
+
 ## Files modified
 
 - `components/Reader.tsx` — add `threadListScrollTopRef`; pass two new props
@@ -99,6 +147,8 @@ described.
   bottom-scroll effect on `!isEmpty`; capture `scrollTop` in the `onOpen`
   wrapper passed to `<ThreadList>`; add a one-shot `useLayoutEffect` to
   restore scroll on mount when in list view.
+- `components/ThreadList.tsx` — hydrate filter/sort synchronously via lazy
+  `useState` initializers; drop the `hydrated` flag.
 
 ## Scope notes
 

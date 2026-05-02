@@ -62,27 +62,29 @@ export function useThreadListRows({
   convsBySelection,
   currentPage,
 }: UseThreadListRowsArgs): UseThreadListRowsResult {
-  const [filter, setFilter] = useState<FilterMode>("page");
-  const [sort, setSort] = useState<SortMode>("date");
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
+  // Hydrate from localStorage synchronously so the first render already shows
+  // the persisted filter/sort. The book page is loaded with ssr: false
+  // (app/books/[bookId]/page.tsx), so window/localStorage are available here.
+  // A post-mount useEffect would change visibleRows after first paint and
+  // race with consumers that read scroll geometry on mount.
+  const [filter, setFilter] = useState<FilterMode>(() => {
     const stored = readThreadListState();
-    if (stored) {
-      if (stored.filter === "page" || stored.filter === "all") {
-        setFilter(stored.filter);
-      }
-      if (stored.sort === "date" || stored.sort === "page") {
-        setSort(stored.sort);
-      }
+    if (stored?.filter === "all" || stored?.filter === "page") {
+      return stored.filter;
     }
-    setHydrated(true);
-  }, []);
+    return "page";
+  });
+  const [sort, setSort] = useState<SortMode>(() => {
+    const stored = readThreadListState();
+    if (stored?.sort === "date" || stored?.sort === "page") {
+      return stored.sort;
+    }
+    return "date";
+  });
 
   useEffect(() => {
-    if (!hydrated) return;
     localStorage.setItem(THREAD_LIST_KEY, JSON.stringify({ filter, sort }));
-  }, [filter, sort, hydrated]);
+  }, [filter, sort]);
 
   const allRows = useMemo<Row[]>(() => {
     type SelInfo = { pages: number[]; sortTop: number; sortLeft: number };

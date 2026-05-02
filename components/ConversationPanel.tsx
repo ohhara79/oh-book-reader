@@ -594,6 +594,7 @@ export default function ConversationPanel({
         setError(`failed to save memo: ${r.status}`);
         return;
       }
+      await loadConversation(conversationId);
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -661,6 +662,7 @@ export default function ConversationPanel({
           }),
         onError: (m) => setError(m),
       });
+      await loadConversation(conversationId);
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

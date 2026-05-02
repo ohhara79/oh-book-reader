@@ -211,6 +211,7 @@ export default function ConversationPanel({
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
   const titleComposingRef = useRef(false);
@@ -383,6 +384,14 @@ export default function ConversationPanel({
       behavior: "smooth",
     });
   }, [messages, streaming, active]);
+
+  useEffect(() => {
+    if (!active) return;
+    const handle = requestAnimationFrame(() => {
+      composerRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [active]);
 
   const listScrollRestoredRef = useRef(false);
   useLayoutEffect(() => {
@@ -1141,6 +1150,7 @@ export default function ConversationPanel({
           }`}
         >
           <textarea
+            ref={composerRef}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             disabled={busy}

@@ -15,6 +15,10 @@ import {
   conversationFilename,
   downloadConversationMarkdown,
 } from "@/lib/exportConversation.client";
+import ThreadList, {
+  type ThreadListConv,
+  type ThreadListSelection,
+} from "./ThreadList";
 
 type Turn =
   | { role: "user"; content: ContentBlock[]; created_at?: number }
@@ -36,6 +40,9 @@ type Props = {
   bookId: string;
   pageNum: number;
   active: ActiveConversation | null;
+  selections: ThreadListSelection[];
+  convsBySelection: Record<string, ThreadListConv[]>;
+  onOpenConversation: (conversationId: string) => void;
   onCreated: () => void;
   onClose: () => void;
 };
@@ -56,6 +63,9 @@ export default function ConversationPanel({
   bookId,
   pageNum,
   active,
+  selections,
+  convsBySelection,
+  onOpenConversation,
   onCreated,
   onClose,
 }: Props) {
@@ -376,6 +386,11 @@ export default function ConversationPanel({
   const isEmpty = !active;
   const busy = streaming || posting;
   const trimmed = question.trim();
+  const totalThreadCount = useMemo(() => {
+    let n = 0;
+    for (const cs of Object.values(convsBySelection)) n += cs.length;
+    return n;
+  }, [convsBySelection]);
 
   return (
     <div className="flex h-full flex-col print:h-auto">
@@ -532,12 +547,26 @@ export default function ConversationPanel({
 
       <div ref={scrollerRef} className="flex-1 overflow-auto px-4 py-3 print:overflow-visible">
         {isEmpty ? (
-          <p className="text-sm text-zinc-500">
-            Drag a rectangle (or press and hold on touch) over a region of the
-            page to start a thread. Use <strong>Memo</strong> to save your own
-            note, or <strong>Ask</strong> to query Claude. Memos appear inline
-            and Claude sees them as context on the next Ask.
-          </p>
+          totalThreadCount === 0 ? (
+            <p className="text-sm text-zinc-500">
+              Drag a rectangle (or press and hold on touch) over a region of the
+              page to start a thread. Use <strong>Memo</strong> to save your own
+              note, or <strong>Ask</strong> to query Claude. Memos appear inline
+              and Claude sees them as context on the next Ask.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <ThreadList
+                selections={selections}
+                convsBySelection={convsBySelection}
+                currentPage={pageNum}
+                onOpen={onOpenConversation}
+              />
+              <p className="px-1 text-xs text-zinc-500">
+                Drag a rectangle on the page to start a new thread.
+              </p>
+            </div>
+          )
         ) : (
           <div className="space-y-4">
             {active?.kind === "new" && <PreviewBox capture={active.capture} />}

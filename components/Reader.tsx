@@ -736,6 +736,11 @@ export default function Reader({ bookId }: { bookId: string }) {
             bookId={bookId}
             pageNum={pageNum}
             active={active}
+            selections={selections}
+            convsBySelection={convsBySelection}
+            onOpenConversation={(conversationId) =>
+              setActive({ kind: "existing", conversationId })
+            }
             onCreated={onConversationCreated}
             onClose={() => setActive(null)}
           />

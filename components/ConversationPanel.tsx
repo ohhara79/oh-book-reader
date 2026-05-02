@@ -13,7 +13,6 @@ import {
 } from "@/lib/exportConversation";
 import {
   conversationFilename,
-  copyConversationMarkdown,
   downloadConversationMarkdown,
 } from "@/lib/exportConversation.client";
 
@@ -65,8 +64,6 @@ export default function ConversationPanel({
   );
   const [existingCapture, setExistingCapture] =
     useState<CapturedSelection | null>(null);
-  const [copiedThread, setCopiedThread] = useState(false);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [question, setQuestion] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -85,11 +82,6 @@ export default function ConversationPanel({
     setExistingCapture(null);
     setDeleting(false);
     setPosting(false);
-    setCopiedThread(false);
-    if (copiedTimerRef.current) {
-      clearTimeout(copiedTimerRef.current);
-      copiedTimerRef.current = null;
-    }
     newConvSentRef.current = false;
 
     if (!active) return;
@@ -122,12 +114,6 @@ export default function ConversationPanel({
     });
   }, [messages, streaming]);
 
-  useEffect(() => {
-    return () => {
-      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-    };
-  }, []);
-
   const exportMarkdown = useMemo(() => {
     if (!rawConversation) return "";
     return conversationToMarkdown({
@@ -136,15 +122,6 @@ export default function ConversationPanel({
     });
   }, [rawConversation, existingCapture]);
 
-  async function onCopyThread() {
-    if (!exportMarkdown) return;
-    const ok = await copyConversationMarkdown(exportMarkdown);
-    if (!ok) return;
-    setCopiedThread(true);
-    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-    copiedTimerRef.current = setTimeout(() => setCopiedThread(false), 1500);
-  }
-
   function onDownloadThread() {
     if (!exportMarkdown || !rawConversation) return;
     const filename = conversationFilename({
@@ -152,10 +129,6 @@ export default function ConversationPanel({
       conversationId: rawConversation.id,
     });
     downloadConversationMarkdown(exportMarkdown, filename);
-  }
-
-  function onPrintThread() {
-    if (typeof window !== "undefined") window.print();
   }
 
   async function startNewConversationAsk(cap: CapturedSelection, q: string) {
@@ -401,45 +374,6 @@ export default function ConversationPanel({
               <>
                 <button
                   type="button"
-                  onClick={onCopyThread}
-                  disabled={busy || deleting || !exportMarkdown}
-                  title={copiedThread ? "Copied!" : "Copy entire thread as Markdown"}
-                  aria-label={copiedThread ? "Copied" : "Copy entire thread as Markdown"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
-                >
-                  {copiedThread ? (
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M3 8.5l3.2 3.2L13 5" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="5" y="5" width="8" height="8" rx="1.5" />
-                      <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" />
-                    </svg>
-                  )}
-                </button>
-                <button
-                  type="button"
                   onClick={onDownloadThread}
                   disabled={busy || deleting || !exportMarkdown}
                   title="Download thread as Markdown (.md)"
@@ -460,30 +394,6 @@ export default function ConversationPanel({
                     <path d="M8 2v8" />
                     <path d="M5 7l3 3 3-3" />
                     <path d="M3 13h10" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={onPrintThread}
-                  disabled={busy || deleting || !exportMarkdown}
-                  title="Print or save as PDF"
-                  aria-label="Print or save as PDF"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
-                >
-                  <svg
-                    viewBox="0 0 16 16"
-                    width="16"
-                    height="16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M4 6V3h8v3" />
-                    <rect x="2.5" y="6" width="11" height="5" rx="1" />
-                    <rect x="4.5" y="9" width="7" height="4" />
                   </svg>
                 </button>
                 <button

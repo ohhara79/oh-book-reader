@@ -212,6 +212,7 @@ export default function ConversationPanel({
   const lastScrollTopRef = useRef(0);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const refocusComposerRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newConvSentRef = useRef(false);
   const titleComposingRef = useRef(false);
@@ -392,6 +393,16 @@ export default function ConversationPanel({
     });
     return () => cancelAnimationFrame(handle);
   }, [active]);
+
+  useEffect(() => {
+    if (streaming || posting) return;
+    if (!refocusComposerRef.current) return;
+    refocusComposerRef.current = false;
+    const handle = requestAnimationFrame(() => {
+      composerRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [streaming, posting]);
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -807,6 +818,7 @@ export default function ConversationPanel({
     setReferencedThreads([]);
     setRefInputOpen(false);
     setRefInputValue("");
+    refocusComposerRef.current = true;
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
       void startNewConversationAsk(active.capture, q, atts, refIds);
@@ -825,6 +837,7 @@ export default function ConversationPanel({
     setReferencedThreads([]);
     setRefInputOpen(false);
     setRefInputValue("");
+    refocusComposerRef.current = true;
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
       void startNewConversationMemo(active.capture, t, atts, refIds);

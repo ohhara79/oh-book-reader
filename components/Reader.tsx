@@ -667,8 +667,21 @@ export default function Reader({ bookId }: { bookId: string }) {
             onClick={goPrev}
             className="rounded border px-3 py-2 disabled:opacity-50 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
             disabled={pageNum <= 1}
+            aria-label="Previous page"
           >
-            Prev
+            <svg
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M10 4 L6 8 L10 12" />
+            </svg>
           </button>
           <span>
             <input
@@ -697,8 +710,21 @@ export default function Reader({ bookId }: { bookId: string }) {
             onClick={goNext}
             className="rounded border px-3 py-2 disabled:opacity-50 active:bg-zinc-100 md:px-2 md:py-1 dark:active:bg-zinc-800"
             disabled={!!numPages && pageNum >= numPages}
+            aria-label="Next page"
           >
-            Next
+            <svg
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 4 L10 8 L6 12" />
+            </svg>
           </button>
           <span className="ml-3 flex items-center gap-1">
             <button

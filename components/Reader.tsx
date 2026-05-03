@@ -342,14 +342,14 @@ export default function Reader({ bookId }: { bookId: string }) {
   const goPrev = useCallback(() => {
     setPageNum((n) => {
       const target = Math.max(1, n - 1);
-      scrollToPage(target);
+      scrollToPage(target, false);
       return target;
     });
   }, []);
   const goNext = useCallback(() => {
     setPageNum((n) => {
       const target = numPages ? Math.min(numPages, n + 1) : n + 1;
-      scrollToPage(target);
+      scrollToPage(target, false);
       return target;
     });
   }, [numPages]);
@@ -476,14 +476,14 @@ export default function Reader({ bookId }: { bookId: string }) {
           if (numPages) {
             e.preventDefault();
             setPageNum(1);
-            scrollToPage(1);
+            scrollToPage(1, false);
           }
           return;
         case "End":
           if (numPages) {
             e.preventDefault();
             setPageNum(numPages);
-            scrollToPage(numPages);
+            scrollToPage(numPages, false);
           }
           return;
         case "+":

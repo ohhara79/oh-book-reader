@@ -2,6 +2,8 @@
 
 A single-user PDF reader with Claude-powered Q&A on selected regions. Open a PDF, draw a box around any text/figure/equation across one or more pages, and ask Claude follow-up questions about that excerpt. Everything lives on the local filesystem under `./data/` — no database.
 
+![oh-book-reader screenshot](docs/examples/oh-book-reader.png)
+
 ## Prerequisites
 
 - **Node.js 20+** (developed on v22).

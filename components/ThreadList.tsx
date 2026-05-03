@@ -25,7 +25,7 @@ type Row = {
 };
 
 type FilterMode = "page" | "all";
-type SortMode = "date" | "page";
+type SortMode = "date-desc" | "date-asc" | "page";
 
 const THREAD_LIST_KEY = "ohbr.threadList";
 
@@ -77,9 +77,14 @@ export function useThreadListRows({
   });
   const [sort, setSort] = useState<SortMode>(() => {
     const stored = readThreadListState();
-    if (stored?.sort === "date" || stored?.sort === "page") {
+    if (
+      stored?.sort === "date-desc" ||
+      stored?.sort === "date-asc" ||
+      stored?.sort === "page"
+    ) {
       return stored.sort;
     }
+    if ((stored?.sort as string | undefined) === "date") return "date-desc";
     return "page";
   });
 
@@ -128,10 +133,11 @@ export function useThreadListRows({
 
   const sortedRows = useMemo<Row[]>(() => {
     const rows = allRows.slice();
-    if (sort === "date") {
+    if (sort === "date-desc" || sort === "date-asc") {
+      const dir = sort === "date-desc" ? -1 : 1;
       rows.sort((a, b) => {
-        if (b.conv.updated_at !== a.conv.updated_at) {
-          return b.conv.updated_at - a.conv.updated_at;
+        if (a.conv.updated_at !== b.conv.updated_at) {
+          return dir * (a.conv.updated_at - b.conv.updated_at);
         }
         return a.conv.id < b.conv.id ? -1 : 1;
       });
@@ -194,7 +200,12 @@ export function ThreadListControls({
   }, [openMenu]);
 
   const filterLabel = filter === "page" ? "This page" : "All pages";
-  const sortLabel = sort === "date" ? "Date" : "Page";
+  const sortLabel =
+    sort === "date-desc"
+      ? "Newest first"
+      : sort === "date-asc"
+        ? "Oldest first"
+        : "Page";
 
   return (
     <div
@@ -244,10 +255,18 @@ export function ThreadListControls({
             },
           },
           {
-            label: "Date",
-            selected: sort === "date",
+            label: "Newest first",
+            selected: sort === "date-desc",
             onSelect: () => {
-              setSort("date");
+              setSort("date-desc");
+              setOpenMenu(null);
+            },
+          },
+          {
+            label: "Oldest first",
+            selected: sort === "date-asc",
+            onSelect: () => {
+              setSort("date-asc");
               setOpenMenu(null);
             },
           },

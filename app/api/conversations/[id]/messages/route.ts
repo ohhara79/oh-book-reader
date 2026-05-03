@@ -23,6 +23,7 @@ import {
 } from "@/lib/promptParts";
 import { validateReferencedThreadIds } from "@/lib/referencedThreads";
 import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
+import { buildConversationHistoryBlocks } from "@/lib/conversationHistory";
 
 export const runtime = "nodejs";
 
@@ -159,15 +160,28 @@ export async function POST(
         sseFrame({ type: "meta", conversationId: conv.id }),
       );
 
-      let assistantText = "";
-      let sessionId = conv.session_id;
-      let assistantUsage: TurnUsage | undefined;
-      let errorMessage: string | undefined;
-      try {
+      type AttemptResult = {
+        assistantText: string;
+        sessionId: string | undefined;
+        assistantUsage: TurnUsage | undefined;
+        errorMessage: string | undefined;
+        sawDelta: boolean;
+      };
+
+      async function runOnce(
+        content: ContentBlock[],
+        resumeId: string | undefined,
+        swallowEarlyError: boolean,
+      ): Promise<AttemptResult> {
+        let assistantText = "";
+        let sessionId: string | undefined = resumeId;
+        let assistantUsage: TurnUsage | undefined;
+        let errorMessage: string | undefined;
+        let sawDelta = false;
         try {
           for await (const ev of askClaude({
-            content: followupContent,
-            resumeSessionId: conv.session_id,
+            content,
+            resumeSessionId: resumeId,
           })) {
             if (ev.kind === "session") {
               sessionId = ev.sessionId;
@@ -175,6 +189,7 @@ export async function POST(
                 sseFrame({ type: "session", sessionId: ev.sessionId }),
               );
             } else if (ev.kind === "delta") {
+              sawDelta = true;
               assistantText += ev.text;
               controller.enqueue(sseFrame({ type: "delta", text: ev.text }));
             } else if (ev.kind === "usage") {
@@ -182,17 +197,61 @@ export async function POST(
               controller.enqueue(sseFrame({ type: "usage", usage: ev.usage }));
             } else if (ev.kind === "error") {
               errorMessage = ev.message;
-              controller.enqueue(sseFrame({ type: "error", message: ev.message }));
+              if (!(swallowEarlyError && !sawDelta)) {
+                controller.enqueue(
+                  sseFrame({ type: "error", message: ev.message }),
+                );
+              }
             } else if (ev.kind === "done") {
               assistantText = ev.fullText || assistantText;
             }
           }
         } catch (err) {
           errorMessage = err instanceof Error ? err.message : String(err);
-          controller.enqueue(
-            sseFrame({ type: "error", message: errorMessage }),
-          );
+          if (!(swallowEarlyError && !sawDelta)) {
+            controller.enqueue(
+              sseFrame({ type: "error", message: errorMessage }),
+            );
+          }
         }
+        return { assistantText, sessionId, assistantUsage, errorMessage, sawDelta };
+      }
+
+      let assistantText = "";
+      let sessionId = conv.session_id;
+      let assistantUsage: TurnUsage | undefined;
+      let errorMessage: string | undefined;
+      try {
+        const first = await runOnce(
+          followupContent,
+          conv.session_id,
+          Boolean(conv.session_id),
+        );
+
+        let final: AttemptResult = first;
+        if (conv.session_id && first.errorMessage && !first.sawDelta) {
+          // Resume failed before any output streamed. Rebuild context from
+          // the persisted conversation JSON and retry without resume so the
+          // SDK starts a fresh session.
+          const promptSpans = await loadSelectionAsPromptSpans(
+            bookId,
+            conv.selection_id,
+          );
+          const fallbackContent: ContentBlock[] = [
+            ...referencedBlocks,
+            ...buildSelectionBlocks(promptSpans),
+            ...buildConversationHistoryBlocks(conv),
+            ...memoBlocks,
+            questionBlock,
+            ...attachmentBlocks,
+          ];
+          final = await runOnce(fallbackContent, undefined, false);
+        }
+
+        assistantText = final.assistantText;
+        sessionId = final.sessionId;
+        assistantUsage = final.assistantUsage;
+        errorMessage = final.errorMessage;
 
         const userTurn: Turn = {
           role: "user",

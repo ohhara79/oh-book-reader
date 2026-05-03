@@ -1,33 +1,20 @@
 import {
   type ContentBlock,
   type Conversation,
-  type Turn,
   findConversationBookId,
   getBook,
   getConversation,
   getSelection,
   readSelectionImage,
 } from "./store";
-import { attachmentBlocks, buildSelectionBlocks } from "./promptParts";
-import { extractUserQuestion } from "./exportConversation";
+import { buildSelectionBlocks } from "./promptParts";
+import { conversationTurnsToBlocks } from "./conversationHistory";
 
 function pageRangeLabel(pages: number[]): string {
   if (pages.length === 0) return "";
   const first = pages[0];
   const last = pages[pages.length - 1];
   return first === last ? `page ${first}` : `pages ${first}–${last}`;
-}
-
-function turnTextForReference(t: Turn): string {
-  if (t.role === "memo") return t.text;
-  let text = "";
-  for (const block of t.content) {
-    if (block.type === "text") {
-      text += (text ? "\n" : "") + block.text;
-    }
-  }
-  if (t.role === "user") text = extractUserQuestion(text);
-  return text;
 }
 
 async function blocksForOneThread(
@@ -81,21 +68,7 @@ async function blocksForOneThread(
 
   const out: ContentBlock[] = [{ type: "text", text: header }];
   out.push(...selectionBlocks);
-
-  for (const t of conv.messages) {
-    if (t.role === "memo") {
-      out.push({ type: "text", text: `Memo:\n${t.text}` });
-      out.push(...attachmentBlocks(t.attachments));
-    } else if (t.role === "user") {
-      const text = turnTextForReference(t);
-      if (text) out.push({ type: "text", text: `Question: ${text}` });
-      out.push(...attachmentBlocks(t.attachments));
-    } else {
-      const text = turnTextForReference(t);
-      if (text) out.push({ type: "text", text: `Answer: ${text}` });
-    }
-  }
-
+  out.push(...conversationTurnsToBlocks(conv.messages));
   out.push({
     type: "text",
     text: `--- End referenced thread "${conv.title || "Untitled"}" ---`,

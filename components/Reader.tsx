@@ -119,6 +119,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const pageNumRef = useRef(pageNum);
   const scaleRef = useRef(scale);
   const ioRafRef = useRef<number | null>(null);
+  const suppressIoUntilRef = useRef(0);
   const restoreScrollDoneRef = useRef(false);
   const threadListScrollTopRef = useRef(0);
   const hoverScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -360,10 +361,17 @@ export default function Reader({ bookId }: { bookId: string }) {
       wrapper.getBoundingClientRect().top -
       main.getBoundingClientRect().top +
       main.scrollTop;
+    suppressIoUntilRef.current = performance.now() + (smooth ? 800 : 150);
     main.scrollTo({
       top: Math.max(0, wrapperTop - 8),
       behavior: smooth ? "smooth" : "auto",
     });
+    if ("onscrollend" in main) {
+      const release = () => {
+        suppressIoUntilRef.current = 0;
+      };
+      main.addEventListener("scrollend", release, { once: true });
+    }
   }, []);
 
   // Restore scroll position on first render after dims become available.
@@ -657,6 +665,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         if (ioRafRef.current != null) cancelAnimationFrame(ioRafRef.current);
         ioRafRef.current = requestAnimationFrame(() => {
           ioRafRef.current = null;
+          if (performance.now() < suppressIoUntilRef.current) return;
           let bestN = 0;
           let bestR = -1;
           for (const [n, r] of ratios) {

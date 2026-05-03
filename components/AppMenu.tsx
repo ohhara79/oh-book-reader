@@ -80,7 +80,7 @@ export default function AppMenu() {
             onClick={onReset}
             className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-zinc-100 active:bg-zinc-200 dark:text-red-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
           >
-            Reset UI to default
+            Reset UI preferences
           </button>
         </div>
       )}

@@ -103,6 +103,9 @@ function turnSection(t: Turn, fallbackTs: number): string {
     return `#### Memo · ${stamp}\n\n${body}${tail}${refs}\n`;
   }
   const heading = t.role === "user" ? "You" : "AI";
+  if (t.role === "assistant" && t.error) {
+    return `### ${heading} · ${stamp}\n\n${body}${tail}${refs}\n\n> **Error:** ${t.error}\n`;
+  }
   return `### ${heading} · ${stamp}\n\n${body}${tail}${refs}\n`;
 }
 

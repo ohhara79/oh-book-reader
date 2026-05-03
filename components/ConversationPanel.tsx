@@ -162,6 +162,7 @@ type DisplayMessage =
       text: string;
       created_at?: number;
       usage?: TurnUsage;
+      error?: string;
     }
   | {
       role: "memo";
@@ -550,7 +551,20 @@ export default function ConversationPanel({
             }
             return next;
           }),
-        onError: (m) => setError(m),
+        onError: (m) => {
+          let attached = false;
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.role === "assistant") {
+              next[next.length - 1] = { ...last, error: m };
+              attached = true;
+              return next;
+            }
+            return prev;
+          });
+          if (!attached) setError(m);
+        },
       });
       if (createdId) await loadConversation(createdId);
       onCreated();
@@ -716,7 +730,20 @@ export default function ConversationPanel({
             }
             return next;
           }),
-        onError: (m) => setError(m),
+        onError: (m) => {
+          let attached = false;
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last && last.role === "assistant") {
+              next[next.length - 1] = { ...last, error: m };
+              attached = true;
+              return next;
+            }
+            return prev;
+          });
+          if (!attached) setError(m);
+        },
       });
       await loadConversation(conversationId);
       onCreated();
@@ -1849,11 +1876,17 @@ function MessageBubble({
       ) : (
         <>
           <MathMarkdown
-            text={m.text || (streaming ? "…" : "")}
+            text={m.text || (streaming && !m.error ? "…" : "")}
             streaming={streaming}
           />
           {streaming && m.text && (
             <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-zinc-400 print:hidden" />
+          )}
+          {m.error && (
+            <div className="mt-2 rounded bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">
+              <p className="mb-1 text-[10px] uppercase tracking-wide">error</p>
+              <p className="whitespace-pre-wrap break-words">{m.error}</p>
+            </div>
           )}
         </>
       )}
@@ -1890,6 +1923,7 @@ function turnsToDisplay(
       text,
       created_at: t.created_at ?? fallbackCreatedAt,
       usage: t.usage,
+      error: t.error,
     };
   });
 }

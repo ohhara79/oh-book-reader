@@ -156,24 +156,33 @@ export async function POST(req: NextRequest) {
       let assistantText = "";
       let sessionId: string | undefined;
       let assistantUsage: TurnUsage | undefined;
+      let errorMessage: string | undefined;
       try {
-        for await (const ev of askClaude({ content: firstUserContent })) {
-          if (ev.kind === "session") {
-            sessionId = ev.sessionId;
-            controller.enqueue(
-              sseFrame({ type: "session", sessionId: ev.sessionId }),
-            );
-          } else if (ev.kind === "delta") {
-            assistantText += ev.text;
-            controller.enqueue(sseFrame({ type: "delta", text: ev.text }));
-          } else if (ev.kind === "usage") {
-            assistantUsage = ev.usage;
-            controller.enqueue(sseFrame({ type: "usage", usage: ev.usage }));
-          } else if (ev.kind === "error") {
-            controller.enqueue(sseFrame({ type: "error", message: ev.message }));
-          } else if (ev.kind === "done") {
-            assistantText = ev.fullText || assistantText;
+        try {
+          for await (const ev of askClaude({ content: firstUserContent })) {
+            if (ev.kind === "session") {
+              sessionId = ev.sessionId;
+              controller.enqueue(
+                sseFrame({ type: "session", sessionId: ev.sessionId }),
+              );
+            } else if (ev.kind === "delta") {
+              assistantText += ev.text;
+              controller.enqueue(sseFrame({ type: "delta", text: ev.text }));
+            } else if (ev.kind === "usage") {
+              assistantUsage = ev.usage;
+              controller.enqueue(sseFrame({ type: "usage", usage: ev.usage }));
+            } else if (ev.kind === "error") {
+              errorMessage = ev.message;
+              controller.enqueue(sseFrame({ type: "error", message: ev.message }));
+            } else if (ev.kind === "done") {
+              assistantText = ev.fullText || assistantText;
+            }
           }
+        } catch (err) {
+          errorMessage = err instanceof Error ? err.message : String(err);
+          controller.enqueue(
+            sseFrame({ type: "error", message: errorMessage }),
+          );
         }
 
         const userTurn: Turn = {
@@ -190,6 +199,7 @@ export async function POST(req: NextRequest) {
           content: [{ type: "text", text: assistantText }],
           created_at: Date.now(),
           ...(assistantUsage ? { usage: assistantUsage } : {}),
+          ...(errorMessage ? { error: errorMessage } : {}),
         };
         await appendMessages(body.bookId, conversation.id, [
           userTurn,

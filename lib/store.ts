@@ -41,6 +41,7 @@ export type Turn =
       content: ContentBlock[];
       created_at?: number;
       usage?: TurnUsage;
+      error?: string;
     }
   | {
       role: "memo";

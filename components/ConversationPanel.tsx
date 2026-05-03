@@ -1547,7 +1547,7 @@ export default function ConversationPanel({
               </button>
               <button
                 type="submit"
-                disabled={busy || (!trimmed && active?.kind !== "new")}
+                disabled={busy || (!trimmed && !(active?.kind === "new" && !conversationId))}
                 className="rounded bg-zinc-900 px-4 py-2 text-sm text-white active:bg-zinc-700 disabled:opacity-50 md:px-3 md:py-1 dark:bg-zinc-100 dark:text-black dark:active:bg-zinc-300"
               >
                 {streaming ? "Asking…" : "Ask"}

@@ -751,6 +751,7 @@ export default function SelectionOverlay({
           }}
           onClick={(e) => {
             e.stopPropagation();
+            setHoverTip(null);
             if (dragMovedRef.current) {
               e.preventDefault();
               dragMovedRef.current = false;

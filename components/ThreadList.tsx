@@ -264,6 +264,7 @@ type Props = {
   currentPage: number;
   onOpen: (conversationId: string) => void;
   onHover?: (selectionId: string | null, pages: number[]) => void;
+  highlightedSelectionId?: string | null;
   focusConvId?: string | null;
   onRequestPageChange?: (page: number) => void;
 };
@@ -275,6 +276,7 @@ export default function ThreadList({
   currentPage,
   onOpen,
   onHover,
+  highlightedSelectionId = null,
   focusConvId = null,
   onRequestPageChange,
 }: Props) {
@@ -405,7 +407,11 @@ export default function ThreadList({
                 }
               }
             }}
-            className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"
+            className={`block w-full rounded border px-3 py-2 text-left active:bg-zinc-100 dark:active:bg-zinc-800 ${
+              r.selectionId === highlightedSelectionId
+                ? "border-zinc-400 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900"
+                : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
+            }`}
           >
             <ThreadHeadingRow
               title={r.conv.title}

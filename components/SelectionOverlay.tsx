@@ -50,6 +50,7 @@ type Props = {
   onCapture: (cap: CapturedSelection) => void;
   onPinClick: (selectionId: string) => void;
   highlightedSelectionId?: string | null;
+  onPinHover?: (selectionId: string | null) => void;
 };
 
 type StackPicker = {
@@ -91,6 +92,7 @@ export default function SelectionOverlay({
   onCapture,
   onPinClick,
   highlightedSelectionId = null,
+  onPinHover,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -697,11 +699,18 @@ export default function SelectionOverlay({
             width: p.width,
             height: p.height,
           }}
-          onMouseEnter={updateHoverTip}
+          onMouseEnter={(e) => {
+            updateHoverTip(e);
+            onPinHover?.(p.selectionId);
+          }}
           onMouseMove={updateHoverTip}
-          onMouseLeave={() => setHoverTip(null)}
+          onMouseLeave={() => {
+            setHoverTip(null);
+            onPinHover?.(null);
+          }}
           onFocus={(e) => {
             pinNavActiveRef.current = true;
+            onPinHover?.(p.selectionId);
             const headings = threadHeadingsBySelection[p.selectionId];
             if (!headings || headings.length === 0) {
               if (hoverTip) setHoverTip(null);
@@ -717,12 +726,16 @@ export default function SelectionOverlay({
           }}
           onBlur={(e) => {
             const next = e.relatedTarget as HTMLElement | null;
-            if (next?.dataset?.pinSelectionId) return;
+            if (next?.dataset?.pinSelectionId) {
+              onPinHover?.(null);
+              return;
+            }
             // Only exit pin-nav mode when focus moves to a concrete
             // non-pin element. relatedTarget is null on programmatic
             // .blur() (e.g., our empty-page handler) — keep pin-nav
             // active so paging back into a populated page re-focuses.
             if (next) pinNavActiveRef.current = false;
+            onPinHover?.(null);
             setHoverTip((prev) => (prev?.source === "focus" ? null : prev));
           }}
           onKeyDown={(e) => {

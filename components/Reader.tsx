@@ -113,6 +113,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [hoveredSelectionId, setHoveredSelectionId] = useState<string | null>(
     null,
   );
+  const [hoveredPinSelectionId, setHoveredPinSelectionId] = useState<
+    string | null
+  >(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -590,6 +593,10 @@ export default function Reader({ bookId }: { bookId: string }) {
     [],
   );
 
+  const handlePinHover = useCallback((selectionId: string | null) => {
+    setHoveredPinSelectionId(selectionId);
+  }, []);
+
   // Enrich selections with a single text snippet per selection so the
   // overlap-disambiguation popover can identify each one. Joining all spans
   // gives a coherent preview when a selection wraps multiple paragraphs.
@@ -956,6 +963,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   onCapture={onCapture}
                   onPinClick={onPinClick}
                   highlightedSelectionId={hoveredSelectionId}
+                  onPinHover={handlePinHover}
                 />
               )}
             </div>
@@ -983,6 +991,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             onCreated={onConversationCreated}
             onClose={() => setActive(null)}
             onThreadHover={handleThreadHover}
+            highlightedSelectionId={hoveredPinSelectionId}
             initialListScrollTop={threadListScrollTopRef.current}
             onListScrollSave={(top) => {
               threadListScrollTopRef.current = top;

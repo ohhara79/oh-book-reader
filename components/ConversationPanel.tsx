@@ -144,6 +144,7 @@ type Props = {
   onCreated: () => void;
   onClose: () => void;
   onThreadHover?: (selectionId: string | null, pages: number[]) => void;
+  highlightedSelectionId?: string | null;
   initialListScrollTop?: number;
   onListScrollSave?: (scrollTop: number) => void;
   initialFocusConvId?: string | null;
@@ -183,6 +184,7 @@ export default function ConversationPanel({
   onCreated,
   onClose,
   onThreadHover,
+  highlightedSelectionId = null,
   initialListScrollTop = 0,
   onListScrollSave,
   initialFocusConvId = null,
@@ -1167,6 +1169,7 @@ export default function ConversationPanel({
                   onOpenConversation(id);
                 }}
                 onHover={onThreadHover}
+                highlightedSelectionId={highlightedSelectionId}
                 focusConvId={initialFocusConvId}
                 onRequestPageChange={onRequestPageChange}
               />

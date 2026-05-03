@@ -447,6 +447,7 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (active) return;
       const t = e.target as HTMLElement | null;
       if (
         t &&
@@ -515,7 +516,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goPrev, goNext, scrollToPage, numPages, handleScaleChange]);
+  }, [active, goPrev, goNext, scrollToPage, numPages, handleScaleChange]);
 
   const onCapture = useCallback((cap: CapturedSelection) => {
     setActive({ kind: "new", capture: cap });

@@ -336,6 +336,7 @@ export default function ThreadList({
         return;
       }
     }
+    if (listRef.current?.contains(document.activeElement)) return;
     buttonRefs.current[0]?.focus();
   }, [currentPage, visibleRows]);
 

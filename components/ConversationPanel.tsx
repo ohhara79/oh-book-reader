@@ -54,6 +54,8 @@ const ATTACHMENT_ACCEPT = [
   ".text",
 ].join(",");
 
+const DEFAULT_NEW_THREAD_QUESTION = "Help me understand this.";
+
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -843,8 +845,11 @@ export default function ConversationPanel({
   }
 
   function submitAsk() {
-    const q = question.trim();
-    if (!q || streaming || posting) return;
+    if (streaming || posting) return;
+    const trimmed = question.trim();
+    const isNewThread = active?.kind === "new" && !newConvSentRef.current;
+    const q = trimmed || (isNewThread ? DEFAULT_NEW_THREAD_QUESTION : "");
+    if (!q) return;
     const atts = attachments;
     const refIds = referencedThreads.map((r) => r.conversationId);
     setQuestion("");
@@ -1542,7 +1547,7 @@ export default function ConversationPanel({
               </button>
               <button
                 type="submit"
-                disabled={busy || !trimmed}
+                disabled={busy || (!trimmed && active?.kind !== "new")}
                 className="rounded bg-zinc-900 px-4 py-2 text-sm text-white active:bg-zinc-700 disabled:opacity-50 md:px-3 md:py-1 dark:bg-zinc-100 dark:text-black dark:active:bg-zinc-300"
               >
                 {streaming ? "Asking…" : "Ask"}

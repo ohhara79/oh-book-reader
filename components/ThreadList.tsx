@@ -296,8 +296,6 @@ export default function ThreadList({
   const wasFocusedRef = useRef(false);
   const listRef = useRef<HTMLUListElement>(null);
   const prevPageRef = useRef(currentPage);
-  const focusedConvIdRef = useRef<string | null>(null);
-  const focusedIdxRef = useRef(-1);
   const pendingFocusConvIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -317,15 +315,7 @@ export default function ThreadList({
         return;
       }
     }
-    const prevConvId = focusedConvIdRef.current;
-    let idx = prevConvId
-      ? visibleRows.findIndex((r) => r.conv.id === prevConvId)
-      : -1;
-    if (idx < 0) {
-      idx = Math.min(focusedIdxRef.current, visibleRows.length - 1);
-      if (idx < 0) idx = 0;
-    }
-    buttonRefs.current[idx]?.focus();
+    buttonRefs.current[0]?.focus();
   }, [currentPage, visibleRows]);
 
   if (visibleRows.length === 0) {
@@ -363,8 +353,6 @@ export default function ThreadList({
             onMouseEnter={() => onHover?.(r.selectionId, r.pages)}
             onMouseLeave={() => onHover?.(null, [])}
             onFocus={() => {
-              focusedConvIdRef.current = r.conv.id;
-              focusedIdxRef.current = idx;
               onHover?.(r.selectionId, r.pages);
             }}
             onBlur={() => onHover?.(null, [])}

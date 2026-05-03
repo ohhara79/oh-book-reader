@@ -1252,7 +1252,7 @@ export default function ConversationPanel({
             onKeyDown={(e) => {
               if (e.key === "Escape" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                onClose();
+                scrollerRef.current?.focus({ preventScroll: true });
                 return;
               }
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

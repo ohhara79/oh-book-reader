@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useShortcutsDialog } from "./ShortcutsDialogProvider";
 
 const STORAGE_PREFIX = "ohbr.";
 const RESET_CONFIRM =
@@ -18,6 +19,7 @@ function clearOhbrLocalStorage() {
 export default function AppMenu() {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const { open: openShortcutsDialog } = useShortcutsDialog();
 
   useEffect(() => {
     if (!open) return;
@@ -74,6 +76,17 @@ export default function AppMenu() {
           role="menu"
           className="absolute right-0 top-full z-10 mt-1 min-w-48 rounded border border-zinc-200 bg-white py-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
         >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              openShortcutsDialog();
+            }}
+            className="block w-full px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+          >
+            Keyboard shortcuts
+          </button>
           <button
             type="button"
             role="menuitem"

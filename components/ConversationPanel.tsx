@@ -1005,7 +1005,7 @@ export default function ConversationPanel({
                   type="button"
                   onClick={deleteConversation}
                   disabled={busy || deleting}
-                  title={deleting ? "Deleting…" : "Delete"}
+                  title={deleting ? "Deleting…" : "Delete (Del)"}
                   aria-label={deleting ? "Deleting" : "Delete"}
                   className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
                 >
@@ -1114,7 +1114,7 @@ export default function ConversationPanel({
             <button
               type="button"
               onClick={onClose}
-              title="Close"
+              title="Close (Esc)"
               aria-label="Close"
               className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 md:h-7 md:w-7 dark:hover:text-zinc-100"
             >

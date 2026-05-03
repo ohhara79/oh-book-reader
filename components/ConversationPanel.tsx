@@ -1246,6 +1246,11 @@ export default function ConversationPanel({
             placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images and text files."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             onKeyDown={(e) => {
+              if (e.key === "Escape" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                onClose();
+                return;
+              }
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 submitMemo();

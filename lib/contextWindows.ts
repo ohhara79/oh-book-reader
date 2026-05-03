@@ -1,4 +1,4 @@
-export const MODEL_NAME = "claude-sonnet-4-6";
+export const MODEL_NAME = "claude-opus-4-7";
 
 const MODEL_MAX_TOKENS: Record<string, number> = {
   [MODEL_NAME]: 200_000,

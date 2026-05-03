@@ -181,9 +181,11 @@ export default function Library() {
                         strokeLinejoin="round"
                         aria-hidden="true"
                       >
-                        <path d="M3 5h10" />
-                        <path d="M6 5V3.5A1 1 0 0 1 7 3h2a1 1 0 0 1 1 1V5" />
-                        <path d="M5 5l1 8a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1l1-8" />
+                        <path d="M6 3.5h4" />
+                        <path d="M2.5 5.5h11" />
+                        <path d="M4.5 5.5l0.6 7.5a1 1 0 0 0 1 0.9h3.8a1 1 0 0 0 1-0.9l0.6-7.5" />
+                        <path d="M6.8 8v3.5" />
+                        <path d="M9.2 8v3.5" />
                       </svg>
                     )}
                   </button>

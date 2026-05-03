@@ -686,7 +686,7 @@ export default function SelectionOverlay({
           tabIndex={p.isPrimary ? 0 : -1}
           data-pin-selection-id={p.selectionId}
           aria-label={`Open conversation for selection ${p.selectionId}`}
-          className={`absolute cursor-pointer border-2 border-amber-500 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40 ${
+          className={`absolute cursor-pointer border-2 border-amber-500 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 focus:border-black focus:outline-none active:bg-amber-500/40 ${
             p.selectionId === highlightedSelectionId
               ? "bg-amber-500/25"
               : "bg-amber-500/10"

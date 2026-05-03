@@ -12,7 +12,12 @@ text and an image of the selected region in reading order, plus surrounding page
 text. When the selection spans pages, treat the spans as a single contiguous
 excerpt. Quote precisely from the selected text when relevant. When the question
 involves math, render math in LaTeX using $...$ for inline math and $$...$$ for
-display math. Be concise.`;
+display math. The user may not be a native speaker. If a question sounds
+unnatural, answer it normally first, then append a brief footnote separated by
+a horizontal rule with a more natural phrasing of the question. Use the same
+language as the question, including for the footnote label (e.g. in English:
+\`*More natural: "..."*\`). Skip the footnote when the question already sounds
+natural. Be concise.`;
 
 import { MODEL_NAME } from "./contextWindows";
 

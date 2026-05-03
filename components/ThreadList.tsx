@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ThreadHeadingRow from "./ThreadHeadingRow";
 
 export type ThreadListSelection = {
@@ -165,46 +165,93 @@ type ThreadListControlsProps = {
   setSort: (s: SortMode) => void;
 };
 
+type OpenMenu = "filter" | "sort" | null;
+
 export function ThreadListControls({
   filter,
   setFilter,
   sort,
   setSort,
 }: ThreadListControlsProps) {
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    function onMouseDown(e: MouseEvent) {
+      if (!wrapperRef.current?.contains(e.target as Node)) setOpenMenu(null);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpenMenu(null);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openMenu]);
+
+  const filterLabel = filter === "page" ? "This page" : "All pages";
+  const sortLabel = sort === "date" ? "Date" : "Page";
+
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-      <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
-        <FilterButton
-          active={filter === "page"}
-          onClick={() => setFilter("page")}
-          title="Show threads on the current page"
-        >
-          This page
-        </FilterButton>
-        <FilterButton
-          active={filter === "all"}
-          onClick={() => setFilter("all")}
-          title="Show threads from every page"
-        >
-          All pages
-        </FilterButton>
-      </div>
-      <div className="inline-flex overflow-hidden rounded border border-zinc-300 text-xs dark:border-zinc-700">
-        <FilterButton
-          active={sort === "date"}
-          onClick={() => setSort("date")}
-          title="Sort by most recently updated"
-        >
-          Date
-        </FilterButton>
-        <FilterButton
-          active={sort === "page"}
-          onClick={() => setSort("page")}
-          title="Sort by page number"
-        >
-          Page
-        </FilterButton>
-      </div>
+    <div
+      ref={wrapperRef}
+      className="flex flex-wrap items-center gap-x-2 gap-y-1.5"
+    >
+      <IconMenu
+        open={openMenu === "filter"}
+        onOpenChange={(o) => setOpenMenu(o ? "filter" : null)}
+        active={filter !== "page"}
+        icon={<FilterIcon />}
+        ariaLabel="Filter threads"
+        title={`Filter: ${filterLabel}`}
+        items={[
+          {
+            label: "This page",
+            selected: filter === "page",
+            onSelect: () => {
+              setFilter("page");
+              setOpenMenu(null);
+            },
+          },
+          {
+            label: "All pages",
+            selected: filter === "all",
+            onSelect: () => {
+              setFilter("all");
+              setOpenMenu(null);
+            },
+          },
+        ]}
+      />
+      <IconMenu
+        open={openMenu === "sort"}
+        onOpenChange={(o) => setOpenMenu(o ? "sort" : null)}
+        active={sort !== "date"}
+        icon={<SortIcon />}
+        ariaLabel="Sort threads"
+        title={`Sort: ${sortLabel}`}
+        items={[
+          {
+            label: "Date",
+            selected: sort === "date",
+            onSelect: () => {
+              setSort("date");
+              setOpenMenu(null);
+            },
+          },
+          {
+            label: "Page",
+            selected: sort === "page",
+            onSelect: () => {
+              setSort("page");
+              setOpenMenu(null);
+            },
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -262,29 +309,105 @@ export default function ThreadList({
   );
 }
 
-function FilterButton({
+type IconMenuItem = {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+};
+
+function IconMenu({
+  open,
+  onOpenChange,
   active,
-  onClick,
+  icon,
+  ariaLabel,
   title,
-  children,
+  items,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   active: boolean;
-  onClick: () => void;
-  title?: string;
-  children: React.ReactNode;
+  icon: React.ReactNode;
+  ariaLabel: string;
+  title: string;
+  items: IconMenuItem[];
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={
-        active
-          ? "bg-zinc-900 px-2.5 py-1 text-white dark:bg-zinc-100 dark:text-black"
-          : "bg-white px-2.5 py-1 text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800"
-      }
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className={
+          active
+            ? "inline-flex h-7 w-7 items-center justify-center rounded border border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-black"
+            : "inline-flex h-7 w-7 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        }
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        title={title}
+      >
+        {icon}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-10 mt-1 min-w-40 rounded border border-zinc-200 bg-white py-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+        >
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={item.onSelect}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-zinc-800 hover:bg-zinc-100 active:bg-zinc-200 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            >
+              <span aria-hidden="true" className="inline-block w-3 text-center">
+                {item.selected ? "✓" : ""}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
     >
-      {children}
-    </button>
+      <path d="M2 3 L14 3 L9.5 8 L9.5 13 L6.5 13 L6.5 8 Z" />
+    </svg>
+  );
+}
+
+function SortIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 4 L13 4" />
+      <path d="M3 8 L11 8" />
+      <path d="M3 12 L9 12" />
+    </svg>
   );
 }

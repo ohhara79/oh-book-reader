@@ -146,6 +146,7 @@ type Props = {
   onThreadHover?: (selectionId: string | null, pages: number[]) => void;
   initialListScrollTop?: number;
   onListScrollSave?: (scrollTop: number) => void;
+  initialFocusConvId?: string | null;
 };
 
 type DisplayMessage =
@@ -182,6 +183,7 @@ export default function ConversationPanel({
   onThreadHover,
   initialListScrollTop = 0,
   onListScrollSave,
+  initialFocusConvId = null,
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -1135,6 +1137,7 @@ export default function ConversationPanel({
                   onOpenConversation(id);
                 }}
                 onHover={onThreadHover}
+                focusConvId={initialFocusConvId}
               />
               <p className="px-1 text-xs text-zinc-500">
                 Drag a rectangle on the page to start a new thread.

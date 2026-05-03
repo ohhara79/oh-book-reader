@@ -122,6 +122,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const suppressIoUntilRef = useRef(0);
   const restoreScrollDoneRef = useRef(false);
   const threadListScrollTopRef = useRef(0);
+  const threadListFocusConvIdRef = useRef<string | null>(null);
   const hoverScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -974,9 +975,10 @@ export default function Reader({ bookId }: { bookId: string }) {
             active={active}
             selections={selections}
             convsBySelection={convsBySelection}
-            onOpenConversation={(conversationId) =>
-              setActive({ kind: "existing", conversationId })
-            }
+            onOpenConversation={(conversationId) => {
+              threadListFocusConvIdRef.current = conversationId;
+              setActive({ kind: "existing", conversationId });
+            }}
             onCreated={onConversationCreated}
             onClose={() => setActive(null)}
             onThreadHover={handleThreadHover}
@@ -984,6 +986,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             onListScrollSave={(top) => {
               threadListScrollTopRef.current = top;
             }}
+            initialFocusConvId={threadListFocusConvIdRef.current}
           />
         </aside>
       </div>

@@ -262,6 +262,7 @@ type Props = {
   currentPage: number;
   onOpen: (conversationId: string) => void;
   onHover?: (selectionId: string | null, pages: number[]) => void;
+  focusConvId?: string | null;
 };
 
 export default function ThreadList({
@@ -270,9 +271,22 @@ export default function ThreadList({
   currentPage,
   onOpen,
   onHover,
+  focusConvId = null,
 }: Props) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   buttonRefs.current.length = visibleRows.length;
+
+  const focusAppliedRef = useRef(false);
+  useEffect(() => {
+    if (focusAppliedRef.current) return;
+    if (!focusConvId) return;
+    const idx = visibleRows.findIndex((r) => r.conv.id === focusConvId);
+    if (idx < 0) return;
+    const btn = buttonRefs.current[idx];
+    if (!btn) return;
+    btn.focus();
+    focusAppliedRef.current = true;
+  }, [focusConvId, visibleRows]);
 
   if (visibleRows.length === 0) {
     return (

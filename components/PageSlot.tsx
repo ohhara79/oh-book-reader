@@ -30,7 +30,7 @@ export default function PageSlot({
       ref={ref}
       data-page-number={pageNumber}
       style={{ width, height }}
-      className="relative bg-white shadow-sm"
+      className="relative bg-white shadow-sm dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
     >
       {mounted ? (
         <Page

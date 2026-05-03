@@ -983,7 +983,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                         data-page-number={n}
                         ref={(el) => registerPageRef(n, el)}
                         style={{ width: 600, height: 800 }}
-                        className="bg-white"
+                        className="bg-white dark:bg-zinc-900"
                       />
                     );
                   }

@@ -1307,7 +1307,7 @@ export default function ConversationPanel({
                     <img
                       src={`data:${a.media_type};base64,${a.data}`}
                       alt={`attachment ${i + 1}`}
-                      className="h-16 w-16 rounded object-cover"
+                      className="h-16 w-16 rounded object-cover dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
                     />
                   ) : (
                     <div
@@ -1596,7 +1596,7 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
             <ZoomableImage
               src={`data:${s.imageMediaType};base64,${s.imageBase64}`}
               alt={`selection page ${s.page}`}
-              className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700"
+              className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
             />
             {capture.spans.length > 1 && (
               <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">
@@ -1676,6 +1676,7 @@ function ZoomableImage({
               src={src}
               alt={alt}
               onClick={(e) => e.stopPropagation()}
+              className="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
             />
           </div>
         </div>
@@ -1694,7 +1695,7 @@ function AttachmentStrip({ attachments }: { attachments: Attachment[] }) {
             key={i}
             src={`data:${a.media_type};base64,${a.data}`}
             alt={`attachment ${i + 1}`}
-            className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700"
+            className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
           />
         ) : (
           <TextAttachmentChip

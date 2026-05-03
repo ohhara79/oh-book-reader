@@ -236,18 +236,18 @@ export function ThreadListControls({
         title={`Sort: ${sortLabel}`}
         items={[
           {
-            label: "Date",
-            selected: sort === "date",
-            onSelect: () => {
-              setSort("date");
-              setOpenMenu(null);
-            },
-          },
-          {
             label: "Page",
             selected: sort === "page",
             onSelect: () => {
               setSort("page");
+              setOpenMenu(null);
+            },
+          },
+          {
+            label: "Date",
+            selected: sort === "date",
+            onSelect: () => {
+              setSort("date");
               setOpenMenu(null);
             },
           },

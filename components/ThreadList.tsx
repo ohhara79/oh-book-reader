@@ -288,6 +288,29 @@ export default function ThreadList({
     focusAppliedRef.current = true;
   }, [focusConvId, visibleRows]);
 
+  const wasFocusedRef = useRef(false);
+  const listRef = useRef<HTMLUListElement>(null);
+  const prevPageRef = useRef(currentPage);
+  const focusedConvIdRef = useRef<string | null>(null);
+  const focusedIdxRef = useRef(-1);
+
+  useEffect(() => {
+    const prevPage = prevPageRef.current;
+    prevPageRef.current = currentPage;
+    if (prevPage === currentPage) return;
+    if (!wasFocusedRef.current) return;
+    if (visibleRows.length === 0) return;
+    const prevConvId = focusedConvIdRef.current;
+    let idx = prevConvId
+      ? visibleRows.findIndex((r) => r.conv.id === prevConvId)
+      : -1;
+    if (idx < 0) {
+      idx = Math.min(focusedIdxRef.current, visibleRows.length - 1);
+      if (idx < 0) idx = 0;
+    }
+    buttonRefs.current[idx]?.focus();
+  }, [currentPage, visibleRows]);
+
   if (visibleRows.length === 0) {
     return (
       <div className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700">
@@ -300,7 +323,18 @@ export default function ThreadList({
     );
   }
   return (
-    <ul className="space-y-1.5">
+    <ul
+      ref={listRef}
+      className="space-y-1.5"
+      onFocus={() => {
+        wasFocusedRef.current = true;
+      }}
+      onBlur={(e) => {
+        if (!listRef.current?.contains(e.relatedTarget as Node | null)) {
+          wasFocusedRef.current = false;
+        }
+      }}
+    >
       {visibleRows.map((r, idx) => (
         <li key={r.conv.id}>
           <button
@@ -311,7 +345,11 @@ export default function ThreadList({
             onClick={() => onOpen(r.conv.id)}
             onMouseEnter={() => onHover?.(r.selectionId, r.pages)}
             onMouseLeave={() => onHover?.(null, [])}
-            onFocus={() => onHover?.(r.selectionId, r.pages)}
+            onFocus={() => {
+              focusedConvIdRef.current = r.conv.id;
+              focusedIdxRef.current = idx;
+              onHover?.(r.selectionId, r.pages);
+            }}
             onBlur={() => onHover?.(null, [])}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {

@@ -820,9 +820,8 @@ export default function Reader({ bookId }: { bookId: string }) {
           </button>
           <span>
             <input
-              type="number"
-              min={1}
-              max={numPages ?? undefined}
+              type="text"
+              inputMode="numeric"
               value={pageInputDraft ?? String(pageNum)}
               onChange={(e) => {
                 setPageInputDraft(e.target.value);

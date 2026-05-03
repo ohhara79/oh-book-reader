@@ -990,7 +990,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             initialFocusConvId={threadListFocusConvIdRef.current}
             onRequestPageChange={(n) => {
               setPageNum(n);
-              scrollToPage(n);
+              scrollToPage(n, false);
             }}
           />
         </aside>

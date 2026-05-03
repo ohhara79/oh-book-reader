@@ -561,7 +561,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         // If real page dims aren't loaded yet, the wrapper is a 600x800
         // placeholder; bbox math would be wrong. Fall back to page top.
         if (!pageDims[targetPage]) {
-          scrollToPage(targetPage);
+          scrollToPage(targetPage, false);
           return;
         }
         const wrapperTop =
@@ -577,7 +577,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         if (boxTop >= viewTop + PAD && boxBottom <= viewBottom - PAD) return;
         main.scrollTo({
           top: Math.max(0, boxTop - PAD),
-          behavior: "smooth",
+          behavior: "auto",
         });
       }, 150);
     },

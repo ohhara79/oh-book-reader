@@ -79,7 +79,7 @@ export function useThreadListRows({
     if (stored?.sort === "date" || stored?.sort === "page") {
       return stored.sort;
     }
-    return "date";
+    return "page";
   });
 
   useEffect(() => {
@@ -229,7 +229,7 @@ export function ThreadListControls({
       <IconMenu
         open={openMenu === "sort"}
         onOpenChange={(o) => setOpenMenu(o ? "sort" : null)}
-        active={sort !== "date"}
+        active={sort !== "page"}
         icon={<SortIcon />}
         ariaLabel="Sort threads"
         title={`Sort: ${sortLabel}`}

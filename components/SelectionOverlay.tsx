@@ -58,6 +58,7 @@ type StackPicker = {
 };
 
 type HoverTip = {
+  source: "hover" | "focus";
   clientX: number;
   clientY: number;
   selectionIds: string[];
@@ -193,8 +194,8 @@ export default function SelectionOverlay({
     if (!el) return;
     const r = el.getBoundingClientRect();
     const margin = 8;
-    let x = hoverTip.clientX + 14;
-    let y = hoverTip.clientY + 18;
+    let x = hoverTip.clientX + (hoverTip.source === "hover" ? 14 : 4);
+    let y = hoverTip.clientY + (hoverTip.source === "hover" ? 18 : 4);
     if (x + r.width > window.innerWidth - margin) {
       x = window.innerWidth - margin - r.width;
     }
@@ -209,7 +210,7 @@ export default function SelectionOverlay({
   // Dismiss the hover tooltip on scroll — the cursor and the underlying box
   // can drift apart while scrolling, leaving a stale tooltip in place.
   useEffect(() => {
-    if (!hoverTip) return;
+    if (!hoverTip || hoverTip.source !== "hover") return;
     const onScroll = () => setHoverTip(null);
     window.addEventListener("scroll", onScroll, true);
     return () => window.removeEventListener("scroll", onScroll, true);
@@ -251,7 +252,12 @@ export default function SelectionOverlay({
       if (hoverTip) setHoverTip(null);
       return;
     }
-    setHoverTip({ clientX: e.clientX, clientY: e.clientY, selectionIds: ids });
+    setHoverTip({
+      source: "hover",
+      clientX: e.clientX,
+      clientY: e.clientY,
+      selectionIds: ids,
+    });
   }
 
   function findHorizontalScroller(): HTMLElement | null {
@@ -665,6 +671,25 @@ export default function SelectionOverlay({
           onMouseEnter={updateHoverTip}
           onMouseMove={updateHoverTip}
           onMouseLeave={() => setHoverTip(null)}
+          onFocus={(e) => {
+            const headings = threadHeadingsBySelection[p.selectionId];
+            if (!headings || headings.length === 0) {
+              if (hoverTip) setHoverTip(null);
+              return;
+            }
+            const r = e.currentTarget.getBoundingClientRect();
+            setHoverTip({
+              source: "focus",
+              clientX: r.right,
+              clientY: r.bottom,
+              selectionIds: [p.selectionId],
+            });
+          }}
+          onBlur={(e) => {
+            const next = e.relatedTarget as HTMLElement | null;
+            if (next?.dataset?.pinSelectionId) return;
+            setHoverTip((prev) => (prev?.source === "focus" ? null : prev));
+          }}
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();

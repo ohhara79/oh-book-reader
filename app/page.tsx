@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import AppMenu from "@/components/AppMenu";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 import { triggerBlobDownload } from "@/lib/exportConversation.client";
 
@@ -106,17 +107,20 @@ export default function Library() {
     <main className="mx-auto max-w-3xl px-6 py-12">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">oh-book-reader</h1>
-        <label className="cursor-pointer rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300">
-          {uploading ? "Uploading…" : "Upload PDF"}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            disabled={uploading}
-            onChange={onUpload}
-          />
-        </label>
+        <div className="flex items-center gap-2">
+          <label className="cursor-pointer rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300">
+            {uploading ? "Uploading…" : "Upload PDF"}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              disabled={uploading}
+              onChange={onUpload}
+            />
+          </label>
+          <AppMenu />
+        </div>
       </header>
 
       {books === null ? (

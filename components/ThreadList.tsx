@@ -54,6 +54,7 @@ export type UseThreadListRowsResult = {
   setFilter: (f: FilterMode) => void;
   sort: SortMode;
   setSort: (s: SortMode) => void;
+  sortedRows: Row[];
   visibleRows: Row[];
 };
 
@@ -155,7 +156,7 @@ export function useThreadListRows({
     return sortedRows.filter((r) => r.pages.includes(currentPage));
   }, [sortedRows, filter, currentPage]);
 
-  return { filter, setFilter, sort, setSort, visibleRows };
+  return { filter, setFilter, sort, setSort, sortedRows, visibleRows };
 }
 
 type ThreadListControlsProps = {
@@ -258,20 +259,24 @@ export function ThreadListControls({
 
 type Props = {
   visibleRows: Row[];
+  sortedRows: Row[];
   filter: FilterMode;
   currentPage: number;
   onOpen: (conversationId: string) => void;
   onHover?: (selectionId: string | null, pages: number[]) => void;
   focusConvId?: string | null;
+  onRequestPageChange?: (page: number) => void;
 };
 
 export default function ThreadList({
   visibleRows,
+  sortedRows,
   filter,
   currentPage,
   onOpen,
   onHover,
   focusConvId = null,
+  onRequestPageChange,
 }: Props) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   buttonRefs.current.length = visibleRows.length;
@@ -293,6 +298,7 @@ export default function ThreadList({
   const prevPageRef = useRef(currentPage);
   const focusedConvIdRef = useRef<string | null>(null);
   const focusedIdxRef = useRef(-1);
+  const pendingFocusConvIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const prevPage = prevPageRef.current;
@@ -300,6 +306,17 @@ export default function ThreadList({
     if (prevPage === currentPage) return;
     if (!wasFocusedRef.current) return;
     if (visibleRows.length === 0) return;
+    const pendingConvId = pendingFocusConvIdRef.current;
+    if (pendingConvId) {
+      pendingFocusConvIdRef.current = null;
+      const pendingIdx = visibleRows.findIndex(
+        (r) => r.conv.id === pendingConvId,
+      );
+      if (pendingIdx >= 0) {
+        buttonRefs.current[pendingIdx]?.focus();
+        return;
+      }
+    }
     const prevConvId = focusedConvIdRef.current;
     let idx = prevConvId
       ? visibleRows.findIndex((r) => r.conv.id === prevConvId)
@@ -354,12 +371,50 @@ export default function ThreadList({
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                buttonRefs.current[
-                  Math.min(idx + 1, visibleRows.length - 1)
-                ]?.focus();
+                if (idx < visibleRows.length - 1) {
+                  buttonRefs.current[idx + 1]?.focus();
+                  return;
+                }
+                if (filter !== "page" || !onRequestPageChange) return;
+                const sortedIdx = sortedRows.findIndex(
+                  (sr) => sr.conv.id === visibleRows[idx]?.conv.id,
+                );
+                if (sortedIdx < 0) return;
+                for (let i = sortedIdx + 1; i < sortedRows.length; i++) {
+                  const target = sortedRows[i];
+                  if (target.pages.includes(currentPage)) continue;
+                  const forward = target.pages.filter((p) => p > currentPage);
+                  const targetPage =
+                    forward.length > 0 ? Math.min(...forward) : target.pages[0];
+                  if (targetPage === undefined) return;
+                  pendingFocusConvIdRef.current = target.conv.id;
+                  onRequestPageChange(targetPage);
+                  return;
+                }
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
-                buttonRefs.current[Math.max(idx - 1, 0)]?.focus();
+                if (idx > 0) {
+                  buttonRefs.current[idx - 1]?.focus();
+                  return;
+                }
+                if (filter !== "page" || !onRequestPageChange) return;
+                const sortedIdx = sortedRows.findIndex(
+                  (sr) => sr.conv.id === visibleRows[idx]?.conv.id,
+                );
+                if (sortedIdx < 0) return;
+                for (let i = sortedIdx - 1; i >= 0; i--) {
+                  const target = sortedRows[i];
+                  if (target.pages.includes(currentPage)) continue;
+                  const backward = target.pages.filter((p) => p < currentPage);
+                  const targetPage =
+                    backward.length > 0
+                      ? Math.max(...backward)
+                      : target.pages[target.pages.length - 1];
+                  if (targetPage === undefined) return;
+                  pendingFocusConvIdRef.current = target.conv.id;
+                  onRequestPageChange(targetPage);
+                  return;
+                }
               }
             }}
             className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"

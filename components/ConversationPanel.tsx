@@ -1252,6 +1252,9 @@ export default function ConversationPanel({
             onKeyDown={(e) => {
               if (e.key === "Escape" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
+                setQuestion("");
+                setAttachments([]);
+                setReferencedThreads([]);
                 scrollerRef.current?.focus({ preventScroll: true });
                 return;
               }

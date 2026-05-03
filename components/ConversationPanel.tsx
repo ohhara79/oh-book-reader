@@ -388,6 +388,7 @@ export default function ConversationPanel({
 
   useEffect(() => {
     if (!active) return;
+    if (active.kind !== "new") return;
     const handle = requestAnimationFrame(() => {
       composerRef.current?.focus();
     });

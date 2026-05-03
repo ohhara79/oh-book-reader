@@ -14,7 +14,7 @@ import CopyButton from "./CopyButton";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 import type { Conversation, Turn, TurnUsage } from "@/lib/store";
 import { MODEL_NAME } from "@/lib/contextWindows";
-import ContextUsageBadge from "./ContextUsageBadge";
+import ContextUsageGauge from "./ContextUsageGauge";
 import {
   type Attachment,
   IMAGE_ATTACHMENT_MEDIA_TYPES,
@@ -1422,6 +1422,9 @@ export default function ConversationPanel({
               if (fileInputRef.current) fileInputRef.current.value = "";
             }}
           />
+          {latestUsage && (
+            <ContextUsageGauge usage={latestUsage} model={MODEL_NAME} />
+          )}
           <div className="mt-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <button
@@ -1491,9 +1494,6 @@ export default function ConversationPanel({
               </button>
             </div>
             <div className="flex items-center gap-2">
-              {latestUsage && (
-                <ContextUsageBadge usage={latestUsage} model={MODEL_NAME} />
-              )}
               <button
                 type="button"
                 onClick={submitMemo}

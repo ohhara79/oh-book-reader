@@ -120,6 +120,8 @@ export default function Reader({ bookId }: { bookId: string }) {
   const mainRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const pdfRef = useRef<DocumentCallback | null>(null);
+  const pageTextCacheRef = useRef<Map<number, Promise<string>>>(new Map());
   const pageNumRef = useRef(pageNum);
   const scaleRef = useRef(scale);
   const ioRafRef = useRef<number | null>(null);
@@ -228,6 +230,8 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   const handleDocumentLoad = useCallback(
     async (pdf: DocumentCallback) => {
+      pdfRef.current = pdf;
+      pageTextCacheRef.current = new Map();
       setNumPages(pdf.numPages);
       restoreScrollDoneRef.current = false;
       // Fetch page 1 first to seed default dims; then everything else in
@@ -516,6 +520,33 @@ export default function Reader({ bookId }: { bookId: string }) {
   const onCapture = useCallback((cap: CapturedSelection) => {
     setActive({ kind: "new", capture: cap });
   }, []);
+
+  const getPageText = useCallback(
+    async (n: number): Promise<string> => {
+      const pdf = pdfRef.current;
+      if (!pdf || n < 1 || (numPages != null && n > numPages)) return "";
+      const cache = pageTextCacheRef.current;
+      let p = cache.get(n);
+      if (!p) {
+        p = (async () => {
+          try {
+            const page = await pdf.getPage(n);
+            const tc = await page.getTextContent();
+            return tc.items
+              .map((it) => ("str" in it ? it.str : ""))
+              .join(" ")
+              .replace(/\s+/g, " ")
+              .trim();
+          } catch {
+            return "";
+          }
+        })();
+        cache.set(n, p);
+      }
+      return p;
+    },
+    [numPages],
+  );
 
   const onConversationCreated = useCallback(async () => {
     await refreshSelections();
@@ -980,6 +1011,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   onPinClick={onPinClick}
                   highlightedSelectionId={hoveredSelectionId}
                   onPinHover={handlePinHover}
+                  getPageText={getPageText}
                 />
               )}
             </div>

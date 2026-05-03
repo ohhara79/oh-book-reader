@@ -51,6 +51,7 @@ type Props = {
   onPinClick: (selectionId: string) => void;
   highlightedSelectionId?: string | null;
   onPinHover?: (selectionId: string | null) => void;
+  getPageText: (n: number) => Promise<string>;
 };
 
 type StackPicker = {
@@ -93,6 +94,7 @@ export default function SelectionOverlay({
   onPinClick,
   highlightedSelectionId = null,
   onPinHover,
+  getPageText,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -552,6 +554,26 @@ export default function SelectionOverlay({
     }
 
     if (spans.length === 0) return;
+
+    const firstPage = spans[0].page;
+    const lastPage = spans[spans.length - 1].page;
+    const [prevText, nextText] = await Promise.all([
+      getPageText(firstPage - 1),
+      getPageText(lastPage + 1),
+    ]);
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      const parts: string[] = [];
+      if (i === 0 && prevText) {
+        parts.push(`[Page ${firstPage - 1}]\n${prevText}`);
+      }
+      parts.push(`[Page ${s.page}]\n${s.surroundingText}`);
+      if (i === spans.length - 1 && nextText) {
+        parts.push(`[Page ${lastPage + 1}]\n${nextText}`);
+      }
+      spans[i] = { ...s, surroundingText: parts.join("\n\n") };
+    }
+
     onCapture({ spans });
   }
 

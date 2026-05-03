@@ -71,7 +71,9 @@ export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
       },
       {
         type: "text",
-        text: `Surrounding page text:\n${s.surroundingText || "(none)"}`,
+        text: `Surrounding text (with neighboring pages):\n${
+          s.surroundingText || "(none)"
+        }`,
       },
       {
         type: "image",
@@ -109,14 +111,9 @@ export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
   }
   out.push({
     type: "text",
-    text: spans
-      .map(
-        (s) =>
-          `Surrounding text from page ${s.page}:\n${
-            s.surroundingText || "(none)"
-          }`,
-      )
-      .join("\n\n"),
+    text: `Surrounding text from neighboring pages:\n\n${spans
+      .map((s) => s.surroundingText || "(none)")
+      .join("\n\n")}`,
   });
   return out;
 }

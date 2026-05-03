@@ -397,9 +397,12 @@ export default function ConversationPanel({
 
   useEffect(() => {
     if (!active) return;
-    if (active.kind !== "new") return;
     const handle = requestAnimationFrame(() => {
-      composerRef.current?.focus();
+      if (active.kind === "new") {
+        composerRef.current?.focus();
+      } else {
+        scrollerRef.current?.focus({ preventScroll: true });
+      }
     });
     return () => cancelAnimationFrame(handle);
   }, [active]);
@@ -1139,6 +1142,7 @@ export default function ConversationPanel({
 
       <div
         ref={scrollerRef}
+        tabIndex={-1}
         onScroll={(e) => {
           const el = e.currentTarget;
           const newScrollTop = el.scrollTop;
@@ -1151,7 +1155,7 @@ export default function ConversationPanel({
           }
           lastScrollTopRef.current = newScrollTop;
         }}
-        className="flex-1 overflow-auto px-4 py-3 print:overflow-visible"
+        className="flex-1 overflow-auto px-4 py-3 outline-none print:overflow-visible"
       >
         {isEmpty ? (
           totalThreadCount === 0 ? (

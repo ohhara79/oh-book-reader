@@ -950,6 +950,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   pageOffsets={pageOffsets}
                   pageDims={pageDims}
                   pageWrapperRefs={pageWrapperRefs}
+                  pageNum={pageNum}
                   selections={overlaySelections}
                   threadHeadingsBySelection={threadHeadingsBySelection}
                   onCapture={onCapture}

@@ -44,6 +44,7 @@ type Props = {
   pageOffsets: Record<number, { top: number; left: number }>;
   pageDims: Record<number, { width: number; height: number }>;
   pageWrapperRefs: RefObject<Map<number, HTMLDivElement>>;
+  pageNum: number;
   selections: Sel[];
   threadHeadingsBySelection: Record<string, ThreadHeading[]>;
   onCapture: (cap: CapturedSelection) => void;
@@ -84,6 +85,7 @@ export default function SelectionOverlay({
   pageOffsets,
   pageDims,
   pageWrapperRefs,
+  pageNum,
   selections,
   threadHeadingsBySelection,
   onCapture,
@@ -625,6 +627,25 @@ export default function SelectionOverlay({
 
   const pinButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   pinButtonRefs.current.length = sortedPins.length;
+
+  const prevPageNumRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevPageNumRef.current;
+    prevPageNumRef.current = pageNum;
+    if (prev === null || prev === pageNum) return;
+    const active = document.activeElement as HTMLElement | null;
+    if (!active?.dataset?.pinSelectionId) return;
+    const firstIdx = sortedPins.findIndex((p) => p.page === pageNum);
+    if (firstIdx >= 0) {
+      for (let i = firstIdx; i < sortedPins.length; i++) {
+        if (sortedPins[i].page !== pageNum) break;
+        if (pinButtonRefs.current[i] === active) return;
+      }
+      pinButtonRefs.current[firstIdx]?.focus({ preventScroll: true });
+    } else {
+      active.blur();
+    }
+  }, [pageNum, sortedPins]);
 
   return (
     <div

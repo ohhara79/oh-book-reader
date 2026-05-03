@@ -271,6 +271,9 @@ export default function ThreadList({
   onOpen,
   onHover,
 }: Props) {
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  buttonRefs.current.length = visibleRows.length;
+
   if (visibleRows.length === 0) {
     return (
       <div className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700">
@@ -284,15 +287,29 @@ export default function ThreadList({
   }
   return (
     <ul className="space-y-1.5">
-      {visibleRows.map((r) => (
+      {visibleRows.map((r, idx) => (
         <li key={r.conv.id}>
           <button
             type="button"
+            ref={(el) => {
+              buttonRefs.current[idx] = el;
+            }}
             onClick={() => onOpen(r.conv.id)}
             onMouseEnter={() => onHover?.(r.selectionId, r.pages)}
             onMouseLeave={() => onHover?.(null, [])}
             onFocus={() => onHover?.(r.selectionId, r.pages)}
             onBlur={() => onHover?.(null, [])}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                buttonRefs.current[
+                  Math.min(idx + 1, visibleRows.length - 1)
+                ]?.focus();
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                buttonRefs.current[Math.max(idx - 1, 0)]?.focus();
+              }
+            }}
             className="block w-full rounded border border-zinc-200 bg-white px-3 py-2 text-left hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:active:bg-zinc-800"
           >
             <ThreadHeadingRow

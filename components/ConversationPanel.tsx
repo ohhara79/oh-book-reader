@@ -1844,7 +1844,10 @@ function MessageBubble({
         </>
       ) : (
         <>
-          <MathMarkdown text={m.text || (streaming ? "…" : "")} />
+          <MathMarkdown
+            text={m.text || (streaming ? "…" : "")}
+            streaming={streaming}
+          />
           {streaming && m.text && (
             <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-zinc-400 print:hidden" />
           )}

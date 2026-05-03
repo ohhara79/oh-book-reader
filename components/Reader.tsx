@@ -129,6 +129,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const restoreScrollDoneRef = useRef(false);
   const threadListScrollTopRef = useRef(0);
   const threadListFocusConvIdRef = useRef<string | null>(null);
+  const pinFocusSelectionIdRef = useRef<string | null>(null);
   const hoverScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -557,6 +558,8 @@ export default function Reader({ bookId }: { bookId: string }) {
     (selectionId: string) => {
       const convs = convsBySelection[selectionId] ?? [];
       if (convs.length > 0) {
+        pinFocusSelectionIdRef.current = selectionId;
+        threadListFocusConvIdRef.current = null;
         setActive({ kind: "existing", conversationId: convs[0].id });
       }
     },
@@ -1035,10 +1038,23 @@ export default function Reader({ bookId }: { bookId: string }) {
             convsBySelection={convsBySelection}
             onOpenConversation={(conversationId) => {
               threadListFocusConvIdRef.current = conversationId;
+              pinFocusSelectionIdRef.current = null;
               setActive({ kind: "existing", conversationId });
             }}
             onCreated={onConversationCreated}
-            onClose={() => setActive(null)}
+            onClose={() => {
+              const sel = pinFocusSelectionIdRef.current;
+              pinFocusSelectionIdRef.current = null;
+              setActive(null);
+              if (sel) {
+                requestAnimationFrame(() => {
+                  const btn = document.querySelector<HTMLButtonElement>(
+                    `[data-pin-selection-id="${CSS.escape(sel)}"][tabindex="0"]`,
+                  );
+                  btn?.focus({ preventScroll: true });
+                });
+              }
+            }}
             onThreadHover={handleThreadHover}
             highlightedSelectionId={hoveredPinSelectionId}
             initialListScrollTop={threadListScrollTopRef.current}

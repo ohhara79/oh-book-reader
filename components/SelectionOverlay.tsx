@@ -3,6 +3,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -556,20 +557,68 @@ export default function SelectionOverlay({
   }
 
   // Compute pin positions in overlay coordinates from page offsets + bbox.
-  const pins = selections.flatMap((sel) =>
-    sel.spans
-      .filter((span) => pageOffsets[span.page] && pageDims[span.page])
-      .map((span) => {
+  // Sorted by (page, top, left) so ArrowDown moves visually downward across
+  // pages. Each pin is tagged `isPrimary` for the topmost span on the smallest
+  // page of its selection — primary pins are the Tab stops (one per
+  // selection); arrows still walk through every pin including non-primaries.
+  const sortedPins = useMemo(() => {
+    type Pin = {
+      selectionId: string;
+      spanIndex: number;
+      isPrimary: boolean;
+      page: number;
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    };
+    const pins: Pin[] = [];
+    for (const sel of selections) {
+      let primarySpanIndex = -1;
+      let primaryPage = Number.POSITIVE_INFINITY;
+      let primaryTop = Number.POSITIVE_INFINITY;
+      let primaryLeft = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < sel.spans.length; i++) {
+        const sp = sel.spans[i];
+        const better =
+          sp.page < primaryPage ||
+          (sp.page === primaryPage && sp.bbox[1] < primaryTop) ||
+          (sp.page === primaryPage &&
+            sp.bbox[1] === primaryTop &&
+            sp.bbox[0] < primaryLeft);
+        if (better) {
+          primaryPage = sp.page;
+          primaryTop = sp.bbox[1];
+          primaryLeft = sp.bbox[0];
+          primarySpanIndex = i;
+        }
+      }
+      for (let i = 0; i < sel.spans.length; i++) {
+        const span = sel.spans[i];
         const off = pageOffsets[span.page];
-        return {
+        if (!off || !pageDims[span.page]) continue;
+        pins.push({
           selectionId: sel.id,
+          spanIndex: i,
+          isPrimary: i === primarySpanIndex,
+          page: span.page,
           left: off.left + span.bbox[0] * scale,
           top: off.top + span.bbox[1] * scale,
           width: span.bbox[2] * scale,
           height: span.bbox[3] * scale,
-        };
-      }),
-  );
+        });
+      }
+    }
+    pins.sort((a, b) => {
+      if (a.page !== b.page) return a.page - b.page;
+      if (a.top !== b.top) return a.top - b.top;
+      return a.left - b.left;
+    });
+    return pins;
+  }, [selections, pageOffsets, pageDims, scale]);
+
+  const pinButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  pinButtonRefs.current.length = sortedPins.length;
 
   return (
     <div
@@ -592,10 +641,14 @@ export default function SelectionOverlay({
           }}
         />
       )}
-      {pins.map((p, i) => (
+      {sortedPins.map((p, i) => (
         <button
-          key={`${p.selectionId}-${i}`}
+          key={`${p.selectionId}-${p.spanIndex}`}
+          ref={(el) => {
+            pinButtonRefs.current[i] = el;
+          }}
           type="button"
+          tabIndex={p.isPrimary ? 0 : -1}
           data-pin-selection-id={p.selectionId}
           aria-label={`Open conversation for selection ${p.selectionId}`}
           className={`absolute cursor-pointer border-2 border-amber-500 transition before:absolute before:-inset-2 before:content-[''] hover:bg-amber-500/25 active:bg-amber-500/40 ${
@@ -612,6 +665,17 @@ export default function SelectionOverlay({
           onMouseEnter={updateHoverTip}
           onMouseMove={updateHoverTip}
           onMouseLeave={() => setHoverTip(null)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              pinButtonRefs.current[
+                Math.min(i + 1, sortedPins.length - 1)
+              ]?.focus();
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              pinButtonRefs.current[Math.max(i - 1, 0)]?.focus();
+            }
+          }}
           onClick={(e) => {
             e.stopPropagation();
             if (dragMovedRef.current) {

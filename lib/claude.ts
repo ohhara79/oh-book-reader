@@ -59,6 +59,23 @@ export type AskEvent =
   | { kind: "done"; fullText: string }
   | { kind: "error"; message: string };
 
+const STDERR_TAIL_LIMIT = 2000;
+
+function formatErrorWithStderr(
+  baseMessage: string,
+  chunks: string[],
+): string {
+  if (chunks.length === 0) return baseMessage;
+  const full = chunks.join("").replace(/\s+$/, "");
+  if (!full) return baseMessage;
+  console.error("[askClaude] subprocess stderr:\n" + full);
+  const tail =
+    full.length > STDERR_TAIL_LIMIT
+      ? "…" + full.slice(full.length - STDERR_TAIL_LIMIT)
+      : full;
+  return `${baseMessage}\n\nstderr:\n${tail}`;
+}
+
 export async function* askClaude({
   content,
   resumeSessionId,
@@ -73,9 +90,12 @@ export async function* askClaude({
     yield userMsg;
   })();
 
-  const options: Options = resumeSessionId
-    ? { ...BASE_OPTIONS, resume: resumeSessionId }
-    : BASE_OPTIONS;
+  const stderrChunks: string[] = [];
+  const options: Options = {
+    ...BASE_OPTIONS,
+    ...(resumeSessionId ? { resume: resumeSessionId } : {}),
+    stderr: (data) => stderrChunks.push(data),
+  };
 
   const result = query({ prompt: promptStream, options });
 
@@ -120,10 +140,10 @@ export async function* askClaude({
         if (r.subtype === "error_max_turns" || r.is_error) {
           yield {
             kind: "error",
-            message:
-              typeof r.result === "string"
-                ? r.result
-                : "AI returned an error",
+            message: formatErrorWithStderr(
+              typeof r.result === "string" ? r.result : "AI returned an error",
+              stderrChunks,
+            ),
           };
           return;
         }
@@ -151,7 +171,10 @@ export async function* askClaude({
   } catch (err) {
     yield {
       kind: "error",
-      message: err instanceof Error ? err.message : String(err),
+      message: formatErrorWithStderr(
+        err instanceof Error ? err.message : String(err),
+        stderrChunks,
+      ),
     };
   }
 }

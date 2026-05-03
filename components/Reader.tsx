@@ -116,6 +116,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [hoveredPinSelectionId, setHoveredPinSelectionId] = useState<
     string | null
   >(null);
+  const [pageInputDraft, setPageInputDraft] = useState<string | null>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -787,16 +788,31 @@ export default function Reader({ bookId }: { bookId: string }) {
               type="number"
               min={1}
               max={numPages ?? undefined}
-              value={pageNum}
+              value={pageInputDraft ?? String(pageNum)}
               onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
+                setPageInputDraft(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setPageInputDraft(null);
+                  e.currentTarget.blur();
+                }
+              }}
+              onBlur={() => {
+                if (pageInputDraft === null) return;
+                const v = parseInt(pageInputDraft, 10);
                 if (!Number.isNaN(v)) {
                   const clamped = numPages
                     ? Math.min(numPages, Math.max(1, v))
                     : Math.max(1, v);
                   setPageNum(clamped);
-                  scrollToPage(clamped);
+                  scrollToPage(clamped, false);
                 }
+                setPageInputDraft(null);
               }}
               className="w-16 rounded border px-1 py-0.5 text-center"
             />

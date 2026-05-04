@@ -1056,7 +1056,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 return !h;
               });
             }}
-            className="ml-3 hidden h-8 items-center rounded border px-2 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:text-zinc-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="ml-3 hidden h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             aria-label={sidebarHidden ? "Show conversation panel" : "Hide conversation panel"}
             title={sidebarHidden ? "Show panel (\\)" : "Hide panel (\\)"}
           >

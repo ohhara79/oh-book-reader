@@ -111,6 +111,8 @@ export default function SelectionOverlay({
   const horizontalPanRef = useRef(false);
   const horizontalScrollerRef = useRef<HTMLElement | null>(null);
   const lastPanXRef = useRef<number | null>(null);
+  const panSamplesRef = useRef<{ x: number; t: number }[]>([]);
+  const inertiaRafRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [stackPicker, setStackPicker] = useState<StackPicker | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
@@ -125,6 +127,9 @@ export default function SelectionOverlay({
     return () => {
       if (longPressTimerRef.current !== null) {
         clearTimeout(longPressTimerRef.current);
+      }
+      if (inertiaRafRef.current !== null) {
+        cancelAnimationFrame(inertiaRafRef.current);
       }
     };
   }, []);
@@ -268,6 +273,46 @@ export default function SelectionOverlay({
     });
   }
 
+  function cancelInertia() {
+    if (inertiaRafRef.current !== null) {
+      cancelAnimationFrame(inertiaRafRef.current);
+      inertiaRafRef.current = null;
+    }
+  }
+
+  // Decay-based horizontal flick after a JS-driven pan. Time-constant model:
+  // velocity *= exp(-dt / TAU); asymptotic distance ≈ v0 * TAU. Stops when
+  // velocity falls below a small threshold or scrollLeft is clamped at a
+  // boundary (no further visual change possible).
+  function startHorizontalInertia(scroller: HTMLElement, velocityPxPerMs: number) {
+    cancelInertia();
+    if (Math.abs(velocityPxPerMs) < 0.05) return;
+    const TAU = 325;
+    const MIN_V = 0.01;
+    let last = performance.now();
+    let v = velocityPxPerMs;
+    let prevScrollLeft = scroller.scrollLeft;
+    let stuckFrames = 0;
+    const tick = (now: number) => {
+      const dt = Math.max(1, now - last);
+      last = now;
+      const before = scroller.scrollLeft;
+      scroller.scrollLeft = before - v * dt;
+      v *= Math.exp(-dt / TAU);
+      // Boundary clamp: if scrollLeft didn't change despite a non-zero target,
+      // we've hit an edge — stop so we don't burn frames.
+      if (scroller.scrollLeft === prevScrollLeft) stuckFrames += 1;
+      else stuckFrames = 0;
+      prevScrollLeft = scroller.scrollLeft;
+      if (Math.abs(v) < MIN_V || stuckFrames >= 2) {
+        inertiaRafRef.current = null;
+        return;
+      }
+      inertiaRafRef.current = requestAnimationFrame(tick);
+    };
+    inertiaRafRef.current = requestAnimationFrame(tick);
+  }
+
   function findHorizontalScroller(): HTMLElement | null {
     let el: HTMLElement | null = overlayRef.current?.parentElement ?? null;
     while (el) {
@@ -307,18 +352,21 @@ export default function SelectionOverlay({
     horizontalPanRef.current = false;
     horizontalScrollerRef.current = null;
     lastPanXRef.current = null;
+    panSamplesRef.current = [];
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!e.isPrimary) return;
     if (e.button !== 0) return;
     setHoverTip(null);
+    cancelInertia();
     if (e.pointerType === "touch") {
       pointerStartRef.current = { x: e.clientX, y: e.clientY };
       pointerIdRef.current = e.pointerId;
       lastPanXRef.current = e.clientX;
       horizontalScrollerRef.current = findHorizontalScroller();
       horizontalPanRef.current = false;
+      panSamplesRef.current = [{ x: e.clientX, t: performance.now() }];
       const { clientX, clientY, pointerId } = e;
       const target = e.currentTarget;
       clearLongPress();
@@ -379,6 +427,11 @@ export default function SelectionOverlay({
         const ddx = e.clientX - lastPanXRef.current;
         horizontalScrollerRef.current.scrollLeft -= ddx;
         lastPanXRef.current = e.clientX;
+        const now = performance.now();
+        const samples = panSamplesRef.current;
+        samples.push({ x: e.clientX, t: now });
+        // Keep only the last ~80ms so flick velocity reflects the final motion.
+        while (samples.length > 1 && now - samples[0].t > 80) samples.shift();
       }
       return;
     }
@@ -410,6 +463,18 @@ export default function SelectionOverlay({
       return;
     }
     const wasArmed = armedRef.current;
+    if (horizontalPanRef.current && horizontalScrollerRef.current) {
+      const samples = panSamplesRef.current;
+      if (samples.length >= 2) {
+        const first = samples[0];
+        const last = samples[samples.length - 1];
+        const dt = last.t - first.t;
+        if (dt > 0) {
+          const v = (last.x - first.x) / dt;
+          startHorizontalInertia(horizontalScrollerRef.current, v);
+        }
+      }
+    }
     resetGesture();
     if (!wasArmed) return;
     if (!drag) return;

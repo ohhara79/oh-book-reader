@@ -405,6 +405,15 @@ export default function ThreadList({
                       onRequestPageChange(targetPage);
                       return;
                     }
+                    for (let i = 0; i < sortedIdx; i++) {
+                      const target = sortedRows[i];
+                      if (target.pages.includes(currentPage)) continue;
+                      const targetPage = target.pages[0];
+                      if (targetPage === undefined) continue;
+                      pendingFocusConvIdRef.current = target.conv.id;
+                      onRequestPageChange(targetPage);
+                      return;
+                    }
                   }
                 }
                 buttonRefs.current[0]?.focus();
@@ -430,6 +439,16 @@ export default function ThreadList({
                           ? Math.max(...backward)
                           : target.pages[target.pages.length - 1];
                       if (targetPage === undefined) return;
+                      pendingFocusConvIdRef.current = target.conv.id;
+                      onRequestPageChange(targetPage);
+                      return;
+                    }
+                    for (let i = sortedRows.length - 1; i > sortedIdx; i--) {
+                      const target = sortedRows[i];
+                      if (target.pages.includes(currentPage)) continue;
+                      const targetPage =
+                        target.pages[target.pages.length - 1];
+                      if (targetPage === undefined) continue;
                       pendingFocusConvIdRef.current = target.conv.id;
                       onRequestPageChange(targetPage);
                       return;

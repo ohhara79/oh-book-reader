@@ -923,7 +923,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <button
             type="button"
             onClick={goPrev}
-            className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={pageNum <= 1}
             aria-label="Previous page"
             title="Previous page (←)"
@@ -942,7 +942,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               <path d="M10 4 L6 8 L10 12" />
             </svg>
           </button>
-          <span>
+          <span className="inline-flex h-8 items-center whitespace-nowrap rounded border">
             <input
               type="text"
               inputMode="numeric"
@@ -972,16 +972,16 @@ export default function Reader({ bookId }: { bookId: string }) {
                 }
                 setPageInputDraft(null);
               }}
-              className="w-16 rounded border px-1 py-0.5 text-center"
+              className="h-full w-10 border-0 bg-transparent px-1 text-center outline-none focus:ring-0"
             />
-            <span className="ml-1 text-zinc-500">
+            <span className="pr-2 text-zinc-500">
               / {numPages ?? book?.page_count ?? "—"}
             </span>
           </span>
           <button
             type="button"
             onClick={goNext}
-            className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={!!numPages && pageNum >= numPages}
             aria-label="Next page"
             title="Next page (→)"
@@ -1004,7 +1004,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             <button
               type="button"
               onClick={() => stepScale(-0.2)}
-              className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+              className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom out"
               title="Zoom out (-)"
             >
@@ -1028,7 +1028,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             <button
               type="button"
               onClick={() => stepScale(0.2)}
-              className="rounded border px-3 py-2 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 md:py-1 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+              className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom in"
               title="Zoom in (+)"
             >
@@ -1056,7 +1056,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 return !h;
               });
             }}
-            className="ml-3 hidden rounded border px-2 py-1 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:text-zinc-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="ml-3 hidden h-8 items-center rounded border px-2 text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:text-zinc-400 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             aria-label={sidebarHidden ? "Show conversation panel" : "Hide conversation panel"}
             title={sidebarHidden ? "Show panel (\\)" : "Hide panel (\\)"}
           >

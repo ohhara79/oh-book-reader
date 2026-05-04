@@ -385,46 +385,58 @@ export default function ThreadList({
                   buttonRefs.current[idx + 1]?.focus();
                   return;
                 }
-                if (filter !== "page" || !onRequestPageChange) return;
-                const sortedIdx = sortedRows.findIndex(
-                  (sr) => sr.conv.id === visibleRows[idx]?.conv.id,
-                );
-                if (sortedIdx < 0) return;
-                for (let i = sortedIdx + 1; i < sortedRows.length; i++) {
-                  const target = sortedRows[i];
-                  if (target.pages.includes(currentPage)) continue;
-                  const forward = target.pages.filter((p) => p > currentPage);
-                  const targetPage =
-                    forward.length > 0 ? Math.min(...forward) : target.pages[0];
-                  if (targetPage === undefined) return;
-                  pendingFocusConvIdRef.current = target.conv.id;
-                  onRequestPageChange(targetPage);
-                  return;
+                if (filter === "page" && onRequestPageChange) {
+                  const sortedIdx = sortedRows.findIndex(
+                    (sr) => sr.conv.id === visibleRows[idx]?.conv.id,
+                  );
+                  if (sortedIdx >= 0) {
+                    for (let i = sortedIdx + 1; i < sortedRows.length; i++) {
+                      const target = sortedRows[i];
+                      if (target.pages.includes(currentPage)) continue;
+                      const forward = target.pages.filter(
+                        (p) => p > currentPage,
+                      );
+                      const targetPage =
+                        forward.length > 0
+                          ? Math.min(...forward)
+                          : target.pages[0];
+                      if (targetPage === undefined) return;
+                      pendingFocusConvIdRef.current = target.conv.id;
+                      onRequestPageChange(targetPage);
+                      return;
+                    }
+                  }
                 }
+                buttonRefs.current[0]?.focus();
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 if (idx > 0) {
                   buttonRefs.current[idx - 1]?.focus();
                   return;
                 }
-                if (filter !== "page" || !onRequestPageChange) return;
-                const sortedIdx = sortedRows.findIndex(
-                  (sr) => sr.conv.id === visibleRows[idx]?.conv.id,
-                );
-                if (sortedIdx < 0) return;
-                for (let i = sortedIdx - 1; i >= 0; i--) {
-                  const target = sortedRows[i];
-                  if (target.pages.includes(currentPage)) continue;
-                  const backward = target.pages.filter((p) => p < currentPage);
-                  const targetPage =
-                    backward.length > 0
-                      ? Math.max(...backward)
-                      : target.pages[target.pages.length - 1];
-                  if (targetPage === undefined) return;
-                  pendingFocusConvIdRef.current = target.conv.id;
-                  onRequestPageChange(targetPage);
-                  return;
+                if (filter === "page" && onRequestPageChange) {
+                  const sortedIdx = sortedRows.findIndex(
+                    (sr) => sr.conv.id === visibleRows[idx]?.conv.id,
+                  );
+                  if (sortedIdx >= 0) {
+                    for (let i = sortedIdx - 1; i >= 0; i--) {
+                      const target = sortedRows[i];
+                      if (target.pages.includes(currentPage)) continue;
+                      const backward = target.pages.filter(
+                        (p) => p < currentPage,
+                      );
+                      const targetPage =
+                        backward.length > 0
+                          ? Math.max(...backward)
+                          : target.pages[target.pages.length - 1];
+                      if (targetPage === undefined) return;
+                      pendingFocusConvIdRef.current = target.conv.id;
+                      onRequestPageChange(targetPage);
+                      return;
+                    }
+                  }
                 }
+                buttonRefs.current[visibleRows.length - 1]?.focus();
               }
             }}
             className={`block w-full rounded border px-3 py-2 text-left active:bg-zinc-100 dark:active:bg-zinc-800 ${

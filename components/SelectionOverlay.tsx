@@ -749,12 +749,14 @@ export default function SelectionOverlay({
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
-              pinButtonRefs.current[
-                Math.min(i + 1, sortedPins.length - 1)
-              ]?.focus();
+              if (sortedPins.length === 0) return;
+              const next = (i + 1) % sortedPins.length;
+              pinButtonRefs.current[next]?.focus();
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
-              pinButtonRefs.current[Math.max(i - 1, 0)]?.focus();
+              if (sortedPins.length === 0) return;
+              const prev = (i - 1 + sortedPins.length) % sortedPins.length;
+              pinButtonRefs.current[prev]?.focus();
             }
           }}
           onClick={(e) => {

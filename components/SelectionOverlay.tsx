@@ -114,6 +114,11 @@ export default function SelectionOverlay({
   const panSamplesRef = useRef<{ x: number; t: number }[]>([]);
   const inertiaRafRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // Tracks whether selection is armed, in order to drive the overlay's
+  // touch-action. While armed we set it to "none" so vertical motion can't
+  // hand the gesture back to the browser as a native scroll (which would
+  // fire pointercancel and erase the selection rectangle).
+  const [armed, setArmed] = useState(false);
   const [stackPicker, setStackPicker] = useState<StackPicker | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
     null,
@@ -334,6 +339,7 @@ export default function SelectionOverlay({
     pointerIdRef.current = pointerId;
     dragMovedRef.current = false;
     setDrag({ startX: x, startY: y, x, y, w: 0, h: 0 });
+    setArmed(true);
   }
 
   function clearLongPress() {
@@ -353,6 +359,7 @@ export default function SelectionOverlay({
     horizontalScrollerRef.current = null;
     lastPanXRef.current = null;
     panSamplesRef.current = [];
+    setArmed(false);
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -742,7 +749,10 @@ export default function SelectionOverlay({
     <div
       ref={overlayRef}
       className="absolute inset-0 select-none md:cursor-crosshair"
-      style={{ zIndex: 10, touchAction: "pan-y pinch-zoom" }}
+      style={{
+        zIndex: 10,
+        touchAction: armed ? "none" : "pan-y pinch-zoom",
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

@@ -77,7 +77,12 @@ function clampSidebarWidth(w: number) {
   return Math.min(Math.max(w, SIDEBAR_MIN), max);
 }
 
-type StoredBookState = { page?: number; scale?: number };
+type StoredBookState = {
+  page?: number;
+  scale?: number;
+  scrollTop?: number;
+  scrollLeft?: number;
+};
 
 function readBookState(id: string): StoredBookState | null {
   try {
@@ -127,6 +132,8 @@ export default function Reader({ bookId }: { bookId: string }) {
   const ioRafRef = useRef<number | null>(null);
   const suppressIoUntilRef = useRef(0);
   const restoreScrollDoneRef = useRef(false);
+  const pendingScrollTopRef = useRef<number | null>(null);
+  const pendingScrollLeftRef = useRef<number | null>(null);
   const threadListScrollTopRef = useRef(0);
   const threadListFocusConvIdRef = useRef<string | null>(null);
   const pinFocusSelectionIdRef = useRef<string | null>(null);
@@ -163,6 +170,10 @@ export default function Reader({ bookId }: { bookId: string }) {
     const h = localStorage.getItem(SIDEBAR_HIDDEN_KEY);
     if (h === "1") setSidebarHidden(true);
 
+    restoreScrollDoneRef.current = false;
+    pendingScrollTopRef.current = null;
+    pendingScrollLeftRef.current = null;
+
     const stored = readBookState(bookId);
     if (stored) {
       if (Number.isFinite(stored.page) && (stored.page as number) >= 1) {
@@ -173,11 +184,25 @@ export default function Reader({ bookId }: { bookId: string }) {
           Math.min(SCALE_MAX, Math.max(SCALE_MIN, stored.scale as number)),
         );
       }
+      if (
+        Number.isFinite(stored.scrollTop) &&
+        (stored.scrollTop as number) >= 0
+      ) {
+        pendingScrollTopRef.current = stored.scrollTop as number;
+      }
+      if (
+        Number.isFinite(stored.scrollLeft) &&
+        (stored.scrollLeft as number) >= 0
+      ) {
+        pendingScrollLeftRef.current = stored.scrollLeft as number;
+      }
     }
 
     const sharedPage = Number(searchParams?.get("page"));
     if (Number.isFinite(sharedPage) && sharedPage >= 1) {
       setPageNum(Math.floor(sharedPage));
+      pendingScrollTopRef.current = null;
+      pendingScrollLeftRef.current = null;
     }
     const sharedConv = searchParams?.get("c");
     if (sharedConv) {
@@ -197,13 +222,28 @@ export default function Reader({ bookId }: { bookId: string }) {
     localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden ? "1" : "0");
   }, [sidebarHidden, hydrated]);
 
+  const persistBookState = useCallback(() => {
+    const main = mainRef.current;
+    const payload: StoredBookState = {
+      page: pageNumRef.current,
+      scale: scaleRef.current,
+    };
+    if (main) {
+      if (Number.isFinite(main.scrollTop) && main.scrollTop >= 0) {
+        payload.scrollTop = main.scrollTop;
+      }
+      if (Number.isFinite(main.scrollLeft) && main.scrollLeft >= 0) {
+        payload.scrollLeft = main.scrollLeft;
+      }
+    }
+    localStorage.setItem(bookStateKey(bookId), JSON.stringify(payload));
+  }, [bookId]);
+
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem(
-      bookStateKey(bookId),
-      JSON.stringify({ page: pageNum, scale }),
-    );
-  }, [bookId, pageNum, scale, hydrated]);
+    if (!restoreScrollDoneRef.current) return;
+    persistBookState();
+  }, [bookId, pageNum, scale, hydrated, persistBookState]);
 
   useEffect(() => {
     if (numPages == null) return;
@@ -390,12 +430,96 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (restoreScrollDoneRef.current) return;
     if (!numPages) return;
     if (!pageDims[pageNum]) return;
+    const pendingTop = pendingScrollTopRef.current;
+    const pendingLeft = pendingScrollLeftRef.current;
+    // Exact-offset restoration needs final scroll{Height,Width}; wait until
+    // all page dims have flushed (restoreSignal bumps after the last batch).
+    if ((pendingTop != null || pendingLeft != null) && restoreSignal === 0) {
+      return;
+    }
     // Defer to next frame so PageSlots have mounted.
     requestAnimationFrame(() => {
-      scrollToPage(pageNum, false);
+      const main = mainRef.current;
+      if (pendingTop != null && main) {
+        const max = Math.max(0, main.scrollHeight - main.clientHeight);
+        const finalTop = Math.min(Math.max(0, pendingTop), max);
+        // Align pageNum with the page actually visible at finalTop so the
+        // renderWindow covers it. Without this, a saved scrollTop that drifts
+        // from saved pageNum (e.g., fast scroll near save time) would put the
+        // viewport on an unmounted page; IO suppression then prevents
+        // self-correction until the user scrolls.
+        const center = finalTop + main.clientHeight / 2;
+        let target = pageNum;
+        for (let n = 1; n <= numPages; n++) {
+          const off = pageOffsets[n];
+          const dim = pageDims[n];
+          if (!off || !dim) break;
+          if (center < off.top + dim.height) {
+            target = n;
+            break;
+          }
+        }
+        if (target !== pageNum) setPageNum(target);
+        suppressIoUntilRef.current = performance.now() + 150;
+        main.scrollTop = finalTop;
+      } else {
+        scrollToPage(pageNum, false);
+      }
+      if (pendingLeft != null && main) {
+        const maxLeft = Math.max(0, main.scrollWidth - main.clientWidth);
+        main.scrollLeft = Math.min(Math.max(0, pendingLeft), maxLeft);
+      }
+      pendingScrollTopRef.current = null;
+      pendingScrollLeftRef.current = null;
       restoreScrollDoneRef.current = true;
+      persistBookState();
     });
-  }, [hydrated, numPages, pageDims, pageNum, scrollToPage, restoreSignal]);
+  }, [
+    hydrated,
+    numPages,
+    pageDims,
+    pageNum,
+    scrollToPage,
+    restoreSignal,
+    persistBookState,
+  ]);
+
+  // Persist scroll position as the user scrolls.
+  useEffect(() => {
+    if (!hydrated) return;
+    const main = mainRef.current;
+    if (!main) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      timer = null;
+      if (!restoreScrollDoneRef.current) return;
+      persistBookState();
+    };
+    const onScroll = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(flush, 150);
+    };
+    const onScrollEnd = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (!restoreScrollDoneRef.current) return;
+      persistBookState();
+    };
+    main.addEventListener("scroll", onScroll, { passive: true });
+    const supportsScrollEnd = "onscrollend" in main;
+    if (supportsScrollEnd) {
+      main.addEventListener("scrollend", onScrollEnd);
+    }
+    return () => {
+      main.removeEventListener("scroll", onScroll);
+      if (supportsScrollEnd) {
+        main.removeEventListener("scrollend", onScrollEnd);
+      }
+      if (timer) clearTimeout(timer);
+    };
+  }, [hydrated, persistBookState]);
 
   // Preserve scroll position across zoom: capture focused-page intra-page
   // ratio before scale changes, restore after layout settles.

@@ -39,9 +39,13 @@ function resolveClaudeExecutable(): string | undefined {
     ? `@anthropic-ai/claude-agent-sdk-linux-${process.arch}`
     : `@anthropic-ai/claude-agent-sdk-linux-${process.arch}-musl`;
 
-  const req = createRequire(import.meta.url);
+  const nodeRequire = createRequire(import.meta.url);
+  // Detach `resolve` so Turbopack's static analyzer doesn't trace this as a
+  // require.resolve call — its `turbopackIgnore` magic comment doesn't suppress
+  // the dynamic-argument warning for require.resolve as of Next 16.2.
+  const resolveFn = nodeRequire.resolve.bind(nodeRequire);
   try {
-    return req.resolve(/* turbopackIgnore: true */ `${pkg}/claude`);
+    return resolveFn(`${pkg}/claude`);
   } catch {}
 
   try {

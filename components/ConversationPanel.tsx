@@ -216,6 +216,7 @@ export default function ConversationPanel({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
+  const [titleExpanded, setTitleExpanded] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
@@ -349,6 +350,7 @@ export default function ConversationPanel({
     setEditingTitle(false);
     setTitleDraft("");
     setSavingTitle(false);
+    setTitleExpanded(false);
     newConvSentRef.current = false;
     titleComposingRef.current = false;
     savingTitleRef.current = false;
@@ -912,7 +914,7 @@ export default function ConversationPanel({
 
   return (
     <div className="flex h-full flex-col print:h-auto">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-zinc-200 px-4 py-2 text-sm print:hidden dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-zinc-200 px-4 py-1.5 text-sm print:hidden dark:border-zinc-800">
         <div
           className={
             showThreadListControls ? "min-w-0 shrink-0" : "min-w-0 flex-1"
@@ -968,14 +970,45 @@ export default function ConversationPanel({
                 className="block w-full rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-medium text-zinc-900 outline-none focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-400"
               />
             ) : (
-              <button
-                type="button"
-                onClick={startTitleEdit}
-                title="Rename thread"
-                className="block w-full break-words rounded px-1.5 py-0.5 text-left font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                {rawConversation.title || "Untitled"}
-              </button>
+              <div className="flex min-w-0 items-start gap-1">
+                <button
+                  type="button"
+                  onClick={startTitleEdit}
+                  title={rawConversation.title || "Untitled"}
+                  aria-label="Rename thread"
+                  className={`block min-w-0 flex-1 rounded px-1.5 py-0.5 text-left font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+                    titleExpanded ? "break-words" : "truncate"
+                  }`}
+                >
+                  {rawConversation.title || "Untitled"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTitleExpanded((v) => !v)}
+                  title={titleExpanded ? "Collapse title" : "Show full title"}
+                  aria-label={titleExpanded ? "Collapse title" : "Expand title"}
+                  aria-expanded={titleExpanded}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    {titleExpanded ? (
+                      <path d="M4 10 L8 6 L12 10" />
+                    ) : (
+                      <path d="M4 6 L8 10 L12 6" />
+                    )}
+                  </svg>
+                </button>
+              </div>
             )
           ) : (
             <span className="font-medium">
@@ -1007,7 +1040,7 @@ export default function ConversationPanel({
                   disabled={busy || deleting}
                   title={deleting ? "Deleting…" : "Delete (Del)"}
                   aria-label={deleting ? "Deleting" : "Delete"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
                 >
                   {deleting ? (
                     <svg
@@ -1049,7 +1082,7 @@ export default function ConversationPanel({
                   disabled={busy || deleting || !exportMarkdown}
                   title="Download thread as Markdown (.md)"
                   aria-label="Download thread as Markdown"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 dark:hover:text-zinc-100"
                 >
                   <svg
                     viewBox="0 0 16 16"
@@ -1073,7 +1106,7 @@ export default function ConversationPanel({
                   disabled={busy || deleting}
                   title={copied ? "Copied!" : "Copy share link"}
                   aria-label={copied ? "Share link copied" : "Copy share link"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:hover:text-zinc-100"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 dark:hover:text-zinc-100"
                 >
                   {copied ? (
                     <svg
@@ -1116,7 +1149,7 @@ export default function ConversationPanel({
               onClick={onClose}
               title="Close (Esc)"
               aria-label="Close"
-              className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 md:h-7 md:w-7 dark:hover:text-zinc-100"
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
             >
               <svg
                 viewBox="0 0 16 16"

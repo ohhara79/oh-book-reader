@@ -212,7 +212,7 @@ const TITLE_ANSWER_INPUT_LIMIT = 4000;
 const TITLE_MAX_CHARS = 80;
 
 const TITLE_SYSTEM_PROMPT =
-  "Generate a concise 5-10 word title for this Q&A. Use the same language as the question. Return ONLY the title text — no quotes, no trailing punctuation, no preamble.";
+  "Generate a concise 5-10 word title for this Q&A. Use the same language as the question. Describe any math in plain words rather than LaTeX (e.g. 'x squared', not '$x^2$'). Return ONLY the title text — no quotes, no trailing punctuation, no preamble.";
 
 function cleanTitle(raw: string): string {
   let t = raw.trim().split(/\r?\n/)[0]?.trim() ?? "";

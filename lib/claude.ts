@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import {
   query,
   type Options,
@@ -21,6 +23,37 @@ natural. Be concise.`;
 
 import { MODEL_NAME } from "./contextWindows";
 
+// Workaround for @anthropic-ai/claude-agent-sdk resolving its bundled musl
+// binary first on Linux even on glibc hosts (function `N7` in sdk.mjs): we
+// pick the matching libc variant ourselves so glibc users don't need to set
+// CLAUDE_CODE_PATH.
+function resolveClaudeExecutable(): string | undefined {
+  if (process.env.CLAUDE_CODE_PATH) return process.env.CLAUDE_CODE_PATH;
+  if (process.platform !== "linux") return undefined;
+
+  const report = process.report.getReport() as {
+    header?: { glibcVersionRuntime?: string };
+  };
+  const isGlibc = Boolean(report.header?.glibcVersionRuntime);
+  const pkg = isGlibc
+    ? `@anthropic-ai/claude-agent-sdk-linux-${process.arch}`
+    : `@anthropic-ai/claude-agent-sdk-linux-${process.arch}-musl`;
+
+  const req = createRequire(import.meta.url);
+  try {
+    return req.resolve(`${pkg}/claude`);
+  } catch {}
+
+  try {
+    const out = execFileSync("which", ["claude"], { encoding: "utf8" }).trim();
+    if (out) return out;
+  } catch {}
+
+  return undefined;
+}
+
+const RESOLVED_CLAUDE_PATH = resolveClaudeExecutable();
+
 const BASE_OPTIONS: Options = {
   model: MODEL_NAME,
   systemPrompt: SYSTEM_PROMPT,
@@ -29,11 +62,8 @@ const BASE_OPTIONS: Options = {
   tools: [],
   settingSources: [],
   maxTurns: 1,
-  // Optional override for environments where the SDK's bundled native binary
-  // is missing. Point at an existing Claude Code installation (e.g. one
-  // installed via npm: `claude` on PATH).
-  ...(process.env.CLAUDE_CODE_PATH
-    ? { pathToClaudeCodeExecutable: process.env.CLAUDE_CODE_PATH }
+  ...(RESOLVED_CLAUDE_PATH
+    ? { pathToClaudeCodeExecutable: RESOLVED_CLAUDE_PATH }
     : {}),
 };
 

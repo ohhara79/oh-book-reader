@@ -51,6 +51,7 @@ type Props = {
   onPinClick: (selectionId: string) => void;
   highlightedSelectionId?: string | null;
   onPinHover?: (selectionId: string | null) => void;
+  onPinEscape?: () => void;
   getPageText: (n: number) => Promise<string>;
 };
 
@@ -94,6 +95,7 @@ export default function SelectionOverlay({
   onPinClick,
   highlightedSelectionId = null,
   onPinHover,
+  onPinEscape,
   getPageText,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -757,6 +759,10 @@ export default function SelectionOverlay({
               if (sortedPins.length === 0) return;
               const prev = (i - 1 + sortedPins.length) % sortedPins.length;
               pinButtonRefs.current[prev]?.focus();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              onPinEscape?.();
             }
           }}
           onClick={(e) => {

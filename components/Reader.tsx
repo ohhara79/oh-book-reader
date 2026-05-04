@@ -957,7 +957,8 @@ export default function Reader({ bookId }: { bookId: string }) {
       <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
         <main
           ref={mainRef}
-          className="flex-1 overflow-auto bg-zinc-100 p-6 print:hidden dark:bg-zinc-900"
+          tabIndex={-1}
+          className="flex-1 overflow-auto bg-zinc-100 p-6 outline-none print:hidden dark:bg-zinc-900"
         >
           <Document
             file={fileProp}
@@ -1014,6 +1015,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   onPinClick={onPinClick}
                   highlightedSelectionId={hoveredSelectionId}
                   onPinHover={handlePinHover}
+                  onPinEscape={() => mainRef.current?.focus({ preventScroll: true })}
                   getPageText={getPageText}
                 />
               )}

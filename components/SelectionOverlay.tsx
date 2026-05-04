@@ -652,31 +652,23 @@ export default function SelectionOverlay({
   const pinButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   pinButtonRefs.current.length = sortedPins.length;
 
-  // Tracks whether the user is currently in pin keyboard-nav mode. Set on
-  // pin focus; persists through programmatic .blur() (which leaves
-  // relatedTarget null) so that paging across an empty page and back to a
-  // page with pins still re-grabs focus. Cleared only when focus moves to
-  // a concrete non-pin element (thread list, sidebar input, etc.).
-  const pinNavActiveRef = useRef(false);
   const prevPageNumRef = useRef<number | null>(null);
   useEffect(() => {
     const prev = prevPageNumRef.current;
     prevPageNumRef.current = pageNum;
     if (prev === null || prev === pageNum) return;
-    if (!pinNavActiveRef.current) return;
+    // If a pin held focus before the page changed and that pin isn't on the
+    // new page, blur it so any focus-source tooltip dismisses. Never
+    // programmatically focus a different pin here — doing so caused a
+    // tooltip to pop up off-cursor when the user was scrolling (wheel,
+    // touch, or PageDown) and not actually keyboard-navigating pins.
     const active = document.activeElement as HTMLElement | null;
-    const firstIdx = sortedPins.findIndex((p) => p.page === pageNum);
-    if (firstIdx >= 0) {
-      if (active?.dataset?.pinSelectionId) {
-        for (let i = firstIdx; i < sortedPins.length; i++) {
-          if (sortedPins[i].page !== pageNum) break;
-          if (pinButtonRefs.current[i] === active) return;
-        }
-      }
-      pinButtonRefs.current[firstIdx]?.focus({ preventScroll: true });
-    } else if (active?.dataset?.pinSelectionId) {
-      active.blur();
+    if (!active?.dataset?.pinSelectionId) return;
+    for (let i = 0; i < sortedPins.length; i++) {
+      if (sortedPins[i].page !== pageNum) continue;
+      if (pinButtonRefs.current[i] === active) return;
     }
+    active.blur();
   }, [pageNum, sortedPins]);
 
   return (
@@ -731,7 +723,6 @@ export default function SelectionOverlay({
             onPinHover?.(null);
           }}
           onFocus={(e) => {
-            pinNavActiveRef.current = true;
             onPinHover?.(p.selectionId);
             const headings = threadHeadingsBySelection[p.selectionId];
             if (!headings || headings.length === 0) {
@@ -752,11 +743,6 @@ export default function SelectionOverlay({
               onPinHover?.(null);
               return;
             }
-            // Only exit pin-nav mode when focus moves to a concrete
-            // non-pin element. relatedTarget is null on programmatic
-            // .blur() (e.g., our empty-page handler) — keep pin-nav
-            // active so paging back into a populated page re-focuses.
-            if (next) pinNavActiveRef.current = false;
             onPinHover?.(null);
             setHoverTip((prev) => (prev?.source === "focus" ? null : prev));
           }}

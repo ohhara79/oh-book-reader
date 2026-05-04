@@ -139,6 +139,21 @@ export default function SelectionOverlay({
     };
   }, []);
 
+  // While a selection drag is armed, block native scroll on touchmove. React's
+  // synthetic onPointerMove can't preventDefault scrolling — touchmove must
+  // be non-passive. Without this, vertical motion after long-press lets the
+  // browser commit to a pan-y scroll (touch-action allows it at touchstart),
+  // which fires pointercancel and erases the selection rectangle.
+  useEffect(() => {
+    const el = overlayRef.current;
+    if (!el) return;
+    const onTouchMove = (e: TouchEvent) => {
+      if (armedRef.current) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, []);
+
   // Dismiss the stack-picker popover on outside-click, Escape, or scroll.
   // Scroll dismissal matters because the anchor lives in overlay-relative
   // coords; if the user scrolls the PDF the anchor would drift.

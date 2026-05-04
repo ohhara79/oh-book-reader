@@ -205,3 +205,87 @@ export async function* askClaude({
     };
   }
 }
+
+const TITLE_MODEL = "claude-haiku-4-5";
+const TITLE_TIMEOUT_MS = 15_000;
+const TITLE_ANSWER_INPUT_LIMIT = 4000;
+const TITLE_MAX_CHARS = 80;
+
+const TITLE_SYSTEM_PROMPT =
+  "Generate a concise 5-10 word title for this Q&A. Use the same language as the question. Return ONLY the title text — no quotes, no trailing punctuation, no preamble.";
+
+function cleanTitle(raw: string): string {
+  let t = raw.trim().split(/\r?\n/)[0]?.trim() ?? "";
+  // Strip wrapping quote-like characters once.
+  const open = t.charAt(0);
+  const close = t.charAt(t.length - 1);
+  const pairs: Record<string, string> = {
+    '"': '"',
+    "'": "'",
+    "「": "」",
+    "『": "』",
+    "“": "”",
+    "‘": "’",
+  };
+  if (pairs[open] && pairs[open] === close && t.length >= 2) {
+    t = t.slice(1, -1).trim();
+  }
+  // Strip trailing sentence punctuation.
+  t = t.replace(/[.!?。！？]+$/u, "").trim();
+  return t.slice(0, TITLE_MAX_CHARS);
+}
+
+export async function summarizeForTitle(
+  question: string,
+  answer: string,
+): Promise<string | null> {
+  const userText = `Question: ${question}\n\nAnswer: ${answer.slice(0, TITLE_ANSWER_INPUT_LIMIT)}`;
+
+  const userMsg: SDKUserMessage = {
+    type: "user",
+    message: { role: "user", content: [{ type: "text", text: userText }] },
+    parent_tool_use_id: null,
+  };
+
+  const promptStream = (async function* () {
+    yield userMsg;
+  })();
+
+  const options: Options = {
+    model: TITLE_MODEL,
+    systemPrompt: TITLE_SYSTEM_PROMPT,
+    includePartialMessages: false,
+    permissionMode: "dontAsk",
+    tools: [],
+    settingSources: [],
+    maxTurns: 1,
+    ...(RESOLVED_CLAUDE_PATH
+      ? { pathToClaudeCodeExecutable: RESOLVED_CLAUDE_PATH }
+      : {}),
+  };
+
+  const run = async (): Promise<string | null> => {
+    try {
+      const result = query({ prompt: promptStream, options });
+      let assembled = "";
+      for await (const msg of result) {
+        if (msg.type === "result") {
+          const r = msg as { is_error?: boolean; result?: string };
+          if (r.is_error) return null;
+          if (typeof r.result === "string") assembled = r.result;
+          break;
+        }
+      }
+      const cleaned = cleanTitle(assembled);
+      return cleaned.length > 0 ? cleaned : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const timeout = new Promise<null>((resolve) => {
+    setTimeout(() => resolve(null), TITLE_TIMEOUT_MS);
+  });
+
+  return Promise.race([run(), timeout]);
+}

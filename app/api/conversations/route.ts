@@ -10,8 +10,9 @@ import {
   saveSelection,
   saveConversation,
   appendMessages,
+  getConversation,
 } from "@/lib/store";
-import { askClaude } from "@/lib/claude";
+import { askClaude, summarizeForTitle } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 import { buildFirstUserContent, validateAttachments } from "@/lib/promptParts";
 import { validateReferencedThreadIds } from "@/lib/referencedThreads";
@@ -205,12 +206,25 @@ export async function POST(req: NextRequest) {
           userTurn,
           assistantTurn,
         ]);
+
+        let convDirty = false;
+        const conv = await getConversation(body.bookId, conversation.id);
         if (sessionId) {
-          const conv = await import("@/lib/store").then((m) =>
-            m.getConversation(body.bookId, conversation.id),
-          );
           (conv as Conversation & { session_id?: string }).session_id =
             sessionId;
+          convDirty = true;
+        }
+        if (!errorMessage && assistantText.trim().length > 0) {
+          const summary = await summarizeForTitle(
+            askBody.question,
+            assistantText,
+          );
+          if (summary) {
+            conv.title = summary;
+            convDirty = true;
+          }
+        }
+        if (convDirty) {
           await saveConversation(body.bookId, conv);
         }
         controller.enqueue(sseFrame({ type: "done" }));

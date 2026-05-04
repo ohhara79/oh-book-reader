@@ -923,7 +923,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <button
             type="button"
             onClick={goPrev}
-            className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="flex h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={pageNum <= 1}
             aria-label="Previous page"
             title="Previous page (←)"
@@ -981,7 +981,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           <button
             type="button"
             onClick={goNext}
-            className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="flex h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 disabled:opacity-50 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             disabled={!!numPages && pageNum >= numPages}
             aria-label="Next page"
             title="Next page (→)"
@@ -1004,7 +1004,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             <button
               type="button"
               onClick={() => stepScale(-0.2)}
-              className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+              className="flex h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom out"
               title="Zoom out (-)"
             >
@@ -1028,7 +1028,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             <button
               type="button"
               onClick={() => stepScale(0.2)}
-              className="flex h-8 items-center rounded border px-3 hover:bg-zinc-100 active:bg-zinc-200 md:px-2 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+              className="flex h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
               aria-label="Zoom in"
               title="Zoom in (+)"
             >

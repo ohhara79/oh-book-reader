@@ -108,10 +108,10 @@ export default function SelectionOverlay({
   const pointerIdRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
-  const horizontalPanRef = useRef(false);
-  const horizontalScrollerRef = useRef<HTMLElement | null>(null);
-  const lastPanXRef = useRef<number | null>(null);
-  const panSamplesRef = useRef<{ x: number; t: number }[]>([]);
+  const panActiveRef = useRef(false);
+  const panScrollerRef = useRef<HTMLElement | null>(null);
+  const lastPanRef = useRef<{ x: number; y: number } | null>(null);
+  const panSamplesRef = useRef<{ x: number; y: number; t: number }[]>([]);
   const inertiaRafRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // Tracks whether selection is armed, in order to drive the overlay's
@@ -300,31 +300,46 @@ export default function SelectionOverlay({
     }
   }
 
-  // Decay-based horizontal flick after a JS-driven pan. Time-constant model:
-  // velocity *= exp(-dt / TAU); asymptotic distance ≈ v0 * TAU. Stops when
-  // velocity falls below a small threshold or scrollLeft is clamped at a
-  // boundary (no further visual change possible).
-  function startHorizontalInertia(scroller: HTMLElement, velocityPxPerMs: number) {
+  // Decay-based flick after a JS-driven pan. Time-constant model:
+  // velocity *= exp(-dt / TAU); asymptotic distance per axis ≈ v0 * TAU.
+  // Stops when both axes fall below a small velocity threshold, or when
+  // both scrollLeft and scrollTop are clamped at boundaries for two
+  // consecutive frames (no further visual change possible).
+  function startInertia(
+    scroller: HTMLElement,
+    velocityXPxPerMs: number,
+    velocityYPxPerMs: number,
+  ) {
     cancelInertia();
-    if (Math.abs(velocityPxPerMs) < 0.05) return;
+    if (
+      Math.abs(velocityXPxPerMs) < 0.05 &&
+      Math.abs(velocityYPxPerMs) < 0.05
+    ) {
+      return;
+    }
     const TAU = 325;
     const MIN_V = 0.01;
     let last = performance.now();
-    let v = velocityPxPerMs;
-    let prevScrollLeft = scroller.scrollLeft;
+    let vx = velocityXPxPerMs;
+    let vy = velocityYPxPerMs;
+    let prevLeft = scroller.scrollLeft;
+    let prevTop = scroller.scrollTop;
     let stuckFrames = 0;
     const tick = (now: number) => {
       const dt = Math.max(1, now - last);
       last = now;
-      const before = scroller.scrollLeft;
-      scroller.scrollLeft = before - v * dt;
-      v *= Math.exp(-dt / TAU);
-      // Boundary clamp: if scrollLeft didn't change despite a non-zero target,
-      // we've hit an edge — stop so we don't burn frames.
-      if (scroller.scrollLeft === prevScrollLeft) stuckFrames += 1;
+      scroller.scrollLeft = prevLeft - vx * dt;
+      scroller.scrollTop = prevTop - vy * dt;
+      vx *= Math.exp(-dt / TAU);
+      vy *= Math.exp(-dt / TAU);
+      const stuckX = scroller.scrollLeft === prevLeft;
+      const stuckY = scroller.scrollTop === prevTop;
+      if (stuckX && stuckY) stuckFrames += 1;
       else stuckFrames = 0;
-      prevScrollLeft = scroller.scrollLeft;
-      if (Math.abs(v) < MIN_V || stuckFrames >= 2) {
+      prevLeft = scroller.scrollLeft;
+      prevTop = scroller.scrollTop;
+      const speed = Math.max(Math.abs(vx), Math.abs(vy));
+      if (speed < MIN_V || stuckFrames >= 2) {
         inertiaRafRef.current = null;
         return;
       }
@@ -333,16 +348,17 @@ export default function SelectionOverlay({
     inertiaRafRef.current = requestAnimationFrame(tick);
   }
 
-  function findHorizontalScroller(): HTMLElement | null {
+  function findScroller(): HTMLElement | null {
     let el: HTMLElement | null = overlayRef.current?.parentElement ?? null;
     while (el) {
       const s = getComputedStyle(el);
-      if (
+      const canX =
         (s.overflowX === "auto" || s.overflowX === "scroll") &&
-        el.scrollWidth > el.clientWidth
-      ) {
-        return el;
-      }
+        el.scrollWidth > el.clientWidth;
+      const canY =
+        (s.overflowY === "auto" || s.overflowY === "scroll") &&
+        el.scrollHeight > el.clientHeight;
+      if (canX || canY) return el;
       el = el.parentElement;
     }
     return null;
@@ -370,9 +386,9 @@ export default function SelectionOverlay({
     capturedRef.current = false;
     pointerIdRef.current = null;
     pointerStartRef.current = null;
-    horizontalPanRef.current = false;
-    horizontalScrollerRef.current = null;
-    lastPanXRef.current = null;
+    panActiveRef.current = false;
+    panScrollerRef.current = null;
+    lastPanRef.current = null;
     panSamplesRef.current = [];
     setArmed(false);
   }
@@ -385,10 +401,12 @@ export default function SelectionOverlay({
     if (e.pointerType === "touch") {
       pointerStartRef.current = { x: e.clientX, y: e.clientY };
       pointerIdRef.current = e.pointerId;
-      lastPanXRef.current = e.clientX;
-      horizontalScrollerRef.current = findHorizontalScroller();
-      horizontalPanRef.current = false;
-      panSamplesRef.current = [{ x: e.clientX, t: performance.now() }];
+      lastPanRef.current = { x: e.clientX, y: e.clientY };
+      panScrollerRef.current = findScroller();
+      panActiveRef.current = false;
+      panSamplesRef.current = [
+        { x: e.clientX, y: e.clientY, t: performance.now() },
+      ];
       const { clientX, clientY, pointerId } = e;
       const target = e.currentTarget;
       clearLongPress();
@@ -418,10 +436,10 @@ export default function SelectionOverlay({
       return;
     }
     if (!armedRef.current) {
-      // Touch, pre-arm: cancel long-press if movement exceeds threshold.
-      // Vertical-dominant motion goes back to the browser (touch-action: pan-y);
-      // horizontal-dominant motion is handled here, since pan-y blocks the
-      // browser from scrolling horizontally on its own.
+      // Touch, pre-arm: cancel long-press once movement exceeds threshold and
+      // take over panning in JS for both axes. touch-action: pinch-zoom blocks
+      // the browser from panning either way, so we drive scrollLeft and
+      // scrollTop ourselves to support diagonal pan + flick.
       if (longPressTimerRef.current !== null && pointerStartRef.current) {
         const dx = e.clientX - pointerStartRef.current.x;
         const dy = e.clientY - pointerStartRef.current.y;
@@ -430,11 +448,8 @@ export default function SelectionOverlay({
           TOUCH_CANCEL_MOVE_PX * TOUCH_CANCEL_MOVE_PX
         ) {
           clearLongPress();
-          if (
-            Math.abs(dx) > Math.abs(dy) &&
-            horizontalScrollerRef.current
-          ) {
-            horizontalPanRef.current = true;
+          if (panScrollerRef.current) {
+            panActiveRef.current = true;
           } else {
             pointerIdRef.current = null;
           }
@@ -442,16 +457,18 @@ export default function SelectionOverlay({
         }
       }
       if (
-        horizontalPanRef.current &&
-        horizontalScrollerRef.current &&
-        lastPanXRef.current !== null
+        panActiveRef.current &&
+        panScrollerRef.current &&
+        lastPanRef.current !== null
       ) {
-        const ddx = e.clientX - lastPanXRef.current;
-        horizontalScrollerRef.current.scrollLeft -= ddx;
-        lastPanXRef.current = e.clientX;
+        const ddx = e.clientX - lastPanRef.current.x;
+        const ddy = e.clientY - lastPanRef.current.y;
+        panScrollerRef.current.scrollLeft -= ddx;
+        panScrollerRef.current.scrollTop -= ddy;
+        lastPanRef.current = { x: e.clientX, y: e.clientY };
         const now = performance.now();
         const samples = panSamplesRef.current;
-        samples.push({ x: e.clientX, t: now });
+        samples.push({ x: e.clientX, y: e.clientY, t: now });
         // Keep only the last ~80ms so flick velocity reflects the final motion.
         while (samples.length > 1 && now - samples[0].t > 80) samples.shift();
       }
@@ -485,15 +502,16 @@ export default function SelectionOverlay({
       return;
     }
     const wasArmed = armedRef.current;
-    if (horizontalPanRef.current && horizontalScrollerRef.current) {
+    if (panActiveRef.current && panScrollerRef.current) {
       const samples = panSamplesRef.current;
       if (samples.length >= 2) {
         const first = samples[0];
         const last = samples[samples.length - 1];
         const dt = last.t - first.t;
         if (dt > 0) {
-          const v = (last.x - first.x) / dt;
-          startHorizontalInertia(horizontalScrollerRef.current, v);
+          const vx = (last.x - first.x) / dt;
+          const vy = (last.y - first.y) / dt;
+          startInertia(panScrollerRef.current, vx, vy);
         }
       }
     }
@@ -766,7 +784,7 @@ export default function SelectionOverlay({
       className="absolute inset-0 select-none md:cursor-crosshair"
       style={{
         zIndex: 10,
-        touchAction: armed ? "none" : "pan-y pinch-zoom",
+        touchAction: armed ? "none" : "pinch-zoom",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

@@ -41,7 +41,7 @@ function resolveClaudeExecutable(): string | undefined {
 
   const req = createRequire(import.meta.url);
   try {
-    return req.resolve(`${pkg}/claude`);
+    return req.resolve(/* turbopackIgnore: true */ `${pkg}/claude`);
   } catch {}
 
   try {

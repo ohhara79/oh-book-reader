@@ -108,6 +108,9 @@ export default function SelectionOverlay({
   const pointerIdRef = useRef<number | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const horizontalPanRef = useRef(false);
+  const horizontalScrollerRef = useRef<HTMLElement | null>(null);
+  const lastPanXRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [stackPicker, setStackPicker] = useState<StackPicker | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
@@ -265,6 +268,21 @@ export default function SelectionOverlay({
     });
   }
 
+  function findHorizontalScroller(): HTMLElement | null {
+    let el: HTMLElement | null = overlayRef.current?.parentElement ?? null;
+    while (el) {
+      const s = getComputedStyle(el);
+      if (
+        (s.overflowX === "auto" || s.overflowX === "scroll") &&
+        el.scrollWidth > el.clientWidth
+      ) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }
+
   function armSelection(clientX: number, clientY: number, pointerId: number) {
     const { x, y } = clientToOverlay(clientX, clientY);
     armedRef.current = true;
@@ -286,6 +304,9 @@ export default function SelectionOverlay({
     capturedRef.current = false;
     pointerIdRef.current = null;
     pointerStartRef.current = null;
+    horizontalPanRef.current = false;
+    horizontalScrollerRef.current = null;
+    lastPanXRef.current = null;
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -295,6 +316,9 @@ export default function SelectionOverlay({
     if (e.pointerType === "touch") {
       pointerStartRef.current = { x: e.clientX, y: e.clientY };
       pointerIdRef.current = e.pointerId;
+      lastPanXRef.current = e.clientX;
+      horizontalScrollerRef.current = findHorizontalScroller();
+      horizontalPanRef.current = false;
       const { clientX, clientY, pointerId } = e;
       const target = e.currentTarget;
       clearLongPress();
@@ -324,9 +348,10 @@ export default function SelectionOverlay({
       return;
     }
     if (!armedRef.current) {
-      // Touch, pre-arm: cancel long-press if movement exceeds threshold and
-      // release the pointer back to the browser so it can pan natively
-      // (touch-action: manipulation allows pan in both axes).
+      // Touch, pre-arm: cancel long-press if movement exceeds threshold.
+      // Vertical-dominant motion goes back to the browser (touch-action: pan-y);
+      // horizontal-dominant motion is handled here, since pan-y blocks the
+      // browser from scrolling horizontally on its own.
       if (longPressTimerRef.current !== null && pointerStartRef.current) {
         const dx = e.clientX - pointerStartRef.current.x;
         const dy = e.clientY - pointerStartRef.current.y;
@@ -335,9 +360,25 @@ export default function SelectionOverlay({
           TOUCH_CANCEL_MOVE_PX * TOUCH_CANCEL_MOVE_PX
         ) {
           clearLongPress();
-          pointerIdRef.current = null;
+          if (
+            Math.abs(dx) > Math.abs(dy) &&
+            horizontalScrollerRef.current
+          ) {
+            horizontalPanRef.current = true;
+          } else {
+            pointerIdRef.current = null;
+          }
           pointerStartRef.current = null;
         }
+      }
+      if (
+        horizontalPanRef.current &&
+        horizontalScrollerRef.current &&
+        lastPanXRef.current !== null
+      ) {
+        const ddx = e.clientX - lastPanXRef.current;
+        horizontalScrollerRef.current.scrollLeft -= ddx;
+        lastPanXRef.current = e.clientX;
       }
       return;
     }
@@ -636,7 +677,7 @@ export default function SelectionOverlay({
     <div
       ref={overlayRef}
       className="absolute inset-0 select-none md:cursor-crosshair"
-      style={{ zIndex: 10, touchAction: "manipulation" }}
+      style={{ zIndex: 10, touchAction: "pan-y pinch-zoom" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

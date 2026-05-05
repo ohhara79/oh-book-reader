@@ -966,13 +966,13 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-screen flex-col print:block print:h-auto">
-      <header className="flex flex-wrap items-center justify-between gap-y-1 border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black">
+      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
             href="/"
             className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
           >
-            ←<span className="hidden md:inline"> Library</span>
+            ←
           </Link>
           <span className="block min-w-0 truncate text-sm font-medium">
             {book?.title ?? "Loading…"}

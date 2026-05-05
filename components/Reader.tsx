@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -123,6 +124,9 @@ export default function Reader({ bookId }: { bookId: string }) {
     string | null
   >(null);
   const [pageInputDraft, setPageInputDraft] = useState<string | null>(null);
+  const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
+  const zoomMenuWrapperRef = useRef<HTMLDivElement>(null);
+  const zoomMenuPopoverRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -590,6 +594,42 @@ export default function Reader({ bookId }: { bookId: string }) {
   };
 
   useEffect(() => {
+    if (!zoomMenuOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      if (!zoomMenuWrapperRef.current?.contains(e.target as Node)) {
+        setZoomMenuOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setZoomMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [zoomMenuOpen]);
+  useLayoutEffect(() => {
+    if (!zoomMenuOpen) return;
+    const adjust = () => {
+      const el = zoomMenuPopoverRef.current;
+      if (!el) return;
+      el.style.transform = "";
+      const rect = el.getBoundingClientRect();
+      const padding = 8;
+      let shift = 0;
+      if (rect.left < padding) shift = padding - rect.left;
+      else if (rect.right > window.innerWidth - padding)
+        shift = window.innerWidth - padding - rect.right;
+      if (shift !== 0) el.style.transform = `translateX(${shift}px)`;
+    };
+    adjust();
+    window.addEventListener("resize", adjust);
+    return () => window.removeEventListener("resize", adjust);
+  }, [zoomMenuOpen]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (active) return;
       const t = e.target as HTMLElement | null;
@@ -1019,13 +1059,15 @@ export default function Reader({ bookId }: { bookId: string }) {
               <path d="M6 4 L10 8 L6 12" />
             </svg>
           </button>
-          <span className="ml-3 flex items-center gap-1">
+          <div ref={zoomMenuWrapperRef} className="relative ml-3">
             <button
               type="button"
-              onClick={() => stepScale(-0.2)}
+              onClick={() => setZoomMenuOpen((o) => !o)}
               className="inline-flex h-7 w-7 items-center justify-center rounded border hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
-              aria-label="Zoom out"
-              title="Zoom out (-)"
+              aria-haspopup="dialog"
+              aria-expanded={zoomMenuOpen}
+              aria-label={`Zoom, currently ${Math.round(scale * 100)}%`}
+              title={`Zoom (${Math.round(scale * 100)}%)`}
             >
               <svg
                 viewBox="0 0 16 16"
@@ -1038,35 +1080,86 @@ export default function Reader({ bookId }: { bookId: string }) {
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M4 8 L12 8" />
+                <circle cx="7" cy="7" r="4" />
+                <path d="M10 10 L13.5 13.5" />
               </svg>
             </button>
-            <span className="hidden text-center md:inline-block md:w-12">
-              {Math.round(scale * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => stepScale(0.2)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded border hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
-              aria-label="Zoom in"
-              title="Zoom in (+)"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            {zoomMenuOpen && (
+              <div
+                ref={zoomMenuPopoverRef}
+                role="dialog"
+                aria-label="Zoom"
+                className="absolute right-0 top-full z-30 mt-1 flex w-56 items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
               >
-                <path d="M4 8 L12 8" />
-                <path d="M8 4 L8 12" />
-              </svg>
-            </button>
-          </span>
+                <button
+                  type="button"
+                  onClick={() => stepScale(-0.2)}
+                  disabled={scale <= SCALE_MIN}
+                  title={`Zoom out (${Math.round(scale * 100)}%)`}
+                  aria-label={`Zoom out, currently ${Math.round(scale * 100)}%`}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 8 L12 8" />
+                  </svg>
+                </button>
+                <input
+                  type="range"
+                  min={SCALE_MIN}
+                  max={SCALE_MAX}
+                  step={0.1}
+                  value={scale}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    handleScaleChange(Math.round(n * 10) / 10);
+                  }}
+                  title={`Zoom (${Math.round(scale * 100)}%)`}
+                  aria-label={`Zoom, currently ${Math.round(scale * 100)}%`}
+                  className="h-1 min-w-0 flex-1 cursor-pointer accent-zinc-500 dark:accent-zinc-400"
+                />
+                <span
+                  className="min-w-[2.5rem] shrink-0 text-center text-[10px] tabular-nums text-zinc-500"
+                  aria-hidden="true"
+                >
+                  {Math.round(scale * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => stepScale(0.2)}
+                  disabled={scale >= SCALE_MAX}
+                  title={`Zoom in (${Math.round(scale * 100)}%)`}
+                  aria-label={`Zoom in, currently ${Math.round(scale * 100)}%`}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 8 L12 8" />
+                    <path d="M8 4 L8 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => {

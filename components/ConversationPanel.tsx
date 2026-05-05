@@ -1397,7 +1397,7 @@ export default function ConversationPanel({
             onChange={(e) => setQuestion(e.target.value)}
             disabled={busy}
             rows={1}
-            placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images and text files."
+            aria-label="Memo or question"
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             style={{ fontSize: threadFontSize }}
             onKeyDown={(e) => {

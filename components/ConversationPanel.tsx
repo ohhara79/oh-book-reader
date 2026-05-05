@@ -1440,7 +1440,7 @@ export default function ConversationPanel({
             setDragActive(false);
             void addFiles(files);
           }}
-          className={`border-t p-2 transition-colors print:hidden ${
+          className={`border-t px-2 py-1 transition-colors print:hidden ${
             dragActive
               ? "border-zinc-400 bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900/60"
               : "border-zinc-200 dark:border-zinc-800"
@@ -1453,7 +1453,7 @@ export default function ConversationPanel({
             disabled={busy}
             rows={1}
             aria-label="Memo or question"
-            className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full resize-none rounded border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             onKeyDown={(e) => {
               if (e.key === "Escape" && !e.nativeEvent.isComposing) {
                 e.preventDefault();

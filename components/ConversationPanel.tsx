@@ -68,6 +68,26 @@ function readComposerPreviewEnabled(): boolean {
   }
 }
 
+const FONT_ZOOM_KEY = "ohbr.messageFontZoom";
+const MIN_ZOOM = 0.7;
+const MAX_ZOOM = 1.5;
+const ZOOM_STEP = 0.1;
+const DEFAULT_ZOOM = 1.0;
+const BASE_FS_REM = 0.875;
+
+function readMessageFontZoom(): number {
+  try {
+    const raw = localStorage.getItem(FONT_ZOOM_KEY);
+    if (raw === null) return DEFAULT_ZOOM;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return DEFAULT_ZOOM;
+    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, n));
+    return Math.round(clamped * 10) / 10;
+  } catch {
+    return DEFAULT_ZOOM;
+  }
+}
+
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -238,6 +258,27 @@ export default function ConversationPanel({
       previewEnabled ? "true" : "false",
     );
   }, [previewEnabled]);
+  const [fontZoom, setFontZoom] = useState<number>(() => readMessageFontZoom());
+  useEffect(() => {
+    localStorage.setItem(FONT_ZOOM_KEY, String(fontZoom));
+  }, [fontZoom]);
+  const threadFontSize = useMemo(
+    () => `${(BASE_FS_REM * fontZoom).toFixed(4)}rem`,
+    [fontZoom],
+  );
+  const previewFontSize = useMemo(
+    () => `${(0.75 * fontZoom).toFixed(4)}rem`,
+    [fontZoom],
+  );
+  const fontPercent = Math.round(fontZoom * 100);
+  const decFontZoom = () =>
+    setFontZoom((z) =>
+      Math.max(MIN_ZOOM, Math.round((z - ZOOM_STEP) * 10) / 10),
+    );
+  const incFontZoom = () =>
+    setFontZoom((z) =>
+      Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 10) / 10),
+    );
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
@@ -1053,6 +1094,36 @@ export default function ConversationPanel({
         )}
         {active && (
           <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              onClick={decFontZoom}
+              disabled={fontZoom <= MIN_ZOOM}
+              title={`Decrease font size (${fontPercent}%)`}
+              aria-label={`Decrease font size, currently ${fontPercent}%`}
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+            >
+              <span aria-hidden="true" className="text-[11px] leading-none">
+                A−
+              </span>
+            </button>
+            <span
+              className="min-w-[2.5rem] text-center text-[10px] tabular-nums text-zinc-500"
+              aria-hidden="true"
+            >
+              {fontPercent}%
+            </span>
+            <button
+              type="button"
+              onClick={incFontZoom}
+              disabled={fontZoom >= MAX_ZOOM}
+              title={`Increase font size (${fontPercent}%)`}
+              aria-label={`Increase font size, currently ${fontPercent}%`}
+              className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+            >
+              <span aria-hidden="true" className="text-[13px] leading-none">
+                A+
+              </span>
+            </button>
             {conversationId && rawConversation && (
               <>
                 <button
@@ -1245,9 +1316,17 @@ export default function ConversationPanel({
           )
         ) : (
           <div className="space-y-2">
-            {active?.kind === "new" && <PreviewBox capture={active.capture} />}
+            {active?.kind === "new" && (
+              <PreviewBox
+                capture={active.capture}
+                fontSize={previewFontSize}
+              />
+            )}
             {active?.kind === "existing" && existingCapture && (
-              <PreviewBox capture={existingCapture} />
+              <PreviewBox
+                capture={existingCapture}
+                fontSize={previewFontSize}
+              />
             )}
             {messages.map((m, i) => (
               <MessageBubble
@@ -1259,6 +1338,7 @@ export default function ConversationPanel({
                   m.role === "assistant"
                 }
                 onOpenConversation={onOpenConversation}
+                fontSize={threadFontSize}
               />
             ))}
           </div>
@@ -1305,6 +1385,7 @@ export default function ConversationPanel({
             rows={3}
             placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images and text files."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            style={{ fontSize: threadFontSize }}
             onKeyDown={(e) => {
               if (e.key === "Escape" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
@@ -1529,11 +1610,17 @@ export default function ConversationPanel({
             </div>
           )}
           {previewEnabled && deferredTrimmed && (
-            <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-              <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
+            <div
+              className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+              style={{ fontSize: threadFontSize }}
+            >
+              <p className="mb-1 text-[0.7143em] uppercase tracking-wide text-zinc-500">
                 Preview
               </p>
-              <MathMarkdown text={deferredQuestion} />
+              <MathMarkdown
+                text={deferredQuestion}
+                fontSize={threadFontSize}
+              />
             </div>
           )}
           <input
@@ -1689,7 +1776,13 @@ export default function ConversationPanel({
   );
 }
 
-function PreviewBox({ capture }: { capture: CapturedSelection }) {
+function PreviewBox({
+  capture,
+  fontSize,
+}: {
+  capture: CapturedSelection;
+  fontSize: string;
+}) {
   const first = capture.spans[0];
   const last = capture.spans[capture.spans.length - 1];
   const label =
@@ -1698,9 +1791,12 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
       : `pages ${first.page}–${last.page}`;
   const copyMarkdown = selectionSection(capture);
   return (
-    <div className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+    <div
+      className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900"
+      style={{ fontSize }}
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs uppercase tracking-wide text-zinc-500">
+        <p className="text-[0.8333em] uppercase tracking-wide text-zinc-500">
           Selected region · {label}
         </p>
         <CopyButton text={copyMarkdown} title="Copy selection (image + text)" />
@@ -1714,12 +1810,12 @@ function PreviewBox({ capture }: { capture: CapturedSelection }) {
               className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
             />
             {capture.spans.length > 1 && (
-              <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">
+              <p className="mt-1 text-[0.8333em] uppercase tracking-wide text-zinc-500">
                 page {s.page}
               </p>
             )}
             {s.selectionText && (
-              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
                 {s.selectionText}
               </p>
             )}
@@ -1856,7 +1952,7 @@ function TextAttachmentChip({
         type="button"
         onClick={() => setOpen(true)}
         title={`Open ${name}`}
-        className="inline-flex max-w-[18rem] items-center gap-1.5 rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        className="inline-flex max-w-[18rem] items-center gap-1.5 rounded border border-zinc-200 bg-white px-2 py-1 text-[0.8571em] text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
       >
         <svg
           viewBox="0 0 16 16"
@@ -1921,7 +2017,7 @@ function ReferencedThreadsLine({
   onOpen?: (conversationId: string) => void;
 }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 print:hidden">
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.7857em] text-zinc-500 print:hidden">
       <span className="uppercase tracking-wide">References:</span>
       {ids.map((id) => (
         <button
@@ -1958,21 +2054,26 @@ function MessageBubble({
   m,
   streaming,
   onOpenConversation,
+  fontSize,
 }: {
   m: DisplayMessage;
   streaming: boolean;
   onOpenConversation?: (conversationId: string) => void;
+  fontSize: string;
 }) {
   if (m.role === "memo") {
     return (
-      <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+      <div
+        className="rounded border border-amber-300 bg-amber-50 p-2 text-sm dark:border-amber-900 dark:bg-amber-950/40"
+        style={{ fontSize }}
+      >
         <div className="mb-1 flex items-center justify-between gap-2">
-          <p className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
+          <p className="text-[0.7143em] uppercase tracking-wide text-amber-700 dark:text-amber-400">
             memo · {formatTimestamp(m.created_at)}
           </p>
           <CopyButton text={m.text} />
         </div>
-        <MathMarkdown text={m.text} />
+        <MathMarkdown text={m.text} fontSize={fontSize} />
         {m.attachments && (
           <AttachmentStrip attachments={m.attachments} />
         )}
@@ -1993,10 +2094,11 @@ function MessageBubble({
           ? "ml-6 bg-zinc-100 dark:bg-zinc-800"
           : "mr-6 bg-blue-50 dark:bg-blue-950/50"
       }`}
+      style={{ fontSize }}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
         {m.created_at != null ? (
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">
+          <p className="text-[0.7143em] uppercase tracking-wide text-zinc-500">
             {isUser ? "ask" : "ai"} · {formatTimestamp(m.created_at)}
           </p>
         ) : (
@@ -2006,7 +2108,7 @@ function MessageBubble({
       </div>
       {isUser ? (
         <>
-          <MathMarkdown text={m.text} />
+          <MathMarkdown text={m.text} fontSize={fontSize} />
           {m.attachments && <AttachmentStrip attachments={m.attachments} />}
           {m.referencedThreadIds && m.referencedThreadIds.length > 0 && (
             <ReferencedThreadsLine
@@ -2020,13 +2122,14 @@ function MessageBubble({
           <MathMarkdown
             text={m.text || (streaming && !m.error ? "…" : "")}
             streaming={streaming}
+            fontSize={fontSize}
           />
           {streaming && m.text && (
             <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-zinc-400 print:hidden" />
           )}
           {m.error && (
-            <div className="mt-2 rounded bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">
-              <p className="mb-1 text-[10px] uppercase tracking-wide">error</p>
+            <div className="mt-2 rounded bg-red-50 p-2 text-[0.8571em] text-red-700 dark:bg-red-950 dark:text-red-300">
+              <p className="mb-1 text-[0.8333em] uppercase tracking-wide">error</p>
               <p className="whitespace-pre-wrap break-words">{m.error}</p>
             </div>
           )}

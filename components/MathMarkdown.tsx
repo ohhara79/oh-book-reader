@@ -14,9 +14,11 @@ const rehypePlugins = [rehypeKatex];
 function MathMarkdown({
   text,
   streaming = false,
+  fontSize,
 }: {
   text: string;
   streaming?: boolean;
+  fontSize?: string;
 }) {
   const components = useMemo<Components>(
     () => ({
@@ -38,7 +40,10 @@ function MathMarkdown({
   );
 
   return (
-    <div className="prose prose-sm max-w-none dark:prose-invert">
+    <div
+      className="prose prose-sm max-w-none dark:prose-invert"
+      style={fontSize ? { fontSize } : undefined}
+    >
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
@@ -52,5 +57,8 @@ function MathMarkdown({
 
 export default memo(
   MathMarkdown,
-  (a, b) => a.text === b.text && a.streaming === b.streaming,
+  (a, b) =>
+    a.text === b.text &&
+    a.streaming === b.streaming &&
+    a.fontSize === b.fontSize,
 );

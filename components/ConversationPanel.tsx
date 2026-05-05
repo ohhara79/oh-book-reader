@@ -69,8 +69,8 @@ function readComposerPreviewEnabled(): boolean {
 }
 
 const FONT_ZOOM_KEY = "ohbr.messageFontZoom";
-const MIN_ZOOM = 0.7;
-const MAX_ZOOM = 1.5;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 5.0;
 const ZOOM_STEP = 0.1;
 const DEFAULT_ZOOM = 1.0;
 const BASE_FS_REM = 0.875;

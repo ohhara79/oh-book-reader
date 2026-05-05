@@ -56,6 +56,18 @@ const ATTACHMENT_ACCEPT = [
 
 const DEFAULT_NEW_THREAD_QUESTION = "Help me understand this.";
 
+const COMPOSER_PREVIEW_KEY = "ohbr.composerPreview";
+
+function readComposerPreviewEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem(COMPOSER_PREVIEW_KEY);
+    if (raw === null) return true;
+    return raw !== "false";
+  } catch {
+    return true;
+  }
+}
+
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -217,6 +229,15 @@ export default function ConversationPanel({
   const [titleDraft, setTitleDraft] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
+  const [previewEnabled, setPreviewEnabled] = useState<boolean>(() =>
+    readComposerPreviewEnabled(),
+  );
+  useEffect(() => {
+    localStorage.setItem(
+      COMPOSER_PREVIEW_KEY,
+      previewEnabled ? "true" : "false",
+    );
+  }, [previewEnabled]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
@@ -1507,7 +1528,7 @@ export default function ConversationPanel({
               </button>
             </div>
           )}
-          {deferredTrimmed && (
+          {previewEnabled && deferredTrimmed && (
             <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
               <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500">
                 Preview
@@ -1596,6 +1617,52 @@ export default function ConversationPanel({
                   <path d="M9.5 6.5L11.5 4.5a2.121 2.121 0 0 1 3 3L12 10" />
                   <path d="M6 10l4-4" />
                 </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewEnabled((v) => !v)}
+                title={
+                  previewEnabled
+                    ? "Hide preview while typing"
+                    : "Show preview while typing"
+                }
+                aria-label={previewEnabled ? "Hide preview" : "Show preview"}
+                aria-pressed={previewEnabled}
+                className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100"
+              >
+                {previewEnabled ? (
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+                    <circle cx="8" cy="8" r="2" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M2.5 4.5C1.7 5.6 1.5 8 1.5 8s2.5 4.5 6.5 4.5c1.1 0 2.1-.3 2.9-.8" />
+                    <path d="M6.2 3.7C6.8 3.6 7.4 3.5 8 3.5c4 0 6.5 4.5 6.5 4.5s-.7 1.3-2 2.6" />
+                    <path d="M6.6 6.6a2 2 0 0 0 2.8 2.8" />
+                    <path d="M2 2l12 12" />
+                  </svg>
+                )}
               </button>
             </div>
             <div className="flex items-center gap-2">

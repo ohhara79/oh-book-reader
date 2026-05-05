@@ -1298,6 +1298,16 @@ export default function ConversationPanel({
                 submitMemo();
                 return;
               }
+              // Touch-primary devices have no Shift+Enter on soft keyboards;
+              // let Enter insert a newline and rely on the Ask button to send.
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                typeof window !== "undefined" &&
+                window.matchMedia("(hover: none) and (pointer: coarse)").matches
+              ) {
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 submitAsk();

@@ -34,7 +34,7 @@ const GROUPS: Group[] = [
   {
     title: "Composer",
     rows: [
-      { chords: [["Enter"]], label: "Send question" },
+      { chords: [["Enter"]], label: "Send question (touch: inserts newline — tap Ask to send)" },
       { chords: [["Shift", "Enter"]], label: "New line" },
       { chords: [["⌘", "Enter"], ["Ctrl", "Enter"]], label: "Save memo" },
       { chords: [["Esc"]], label: "Clear draft and unfocus" },

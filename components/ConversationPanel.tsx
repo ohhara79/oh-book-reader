@@ -447,7 +447,10 @@ export default function ConversationPanel({
     if (active.kind === "existing") {
       void (async () => {
         const conv = await loadConversation(active.conversationId);
-        if (!conv) return;
+        if (!conv) {
+          onCloseRef.current();
+          return;
+        }
         setConversationId(conv.id);
         setMessages(turnsToDisplay(conv.messages, conv.created_at));
       })();

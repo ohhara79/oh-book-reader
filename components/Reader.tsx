@@ -60,6 +60,7 @@ const SIDEBAR_MAX_HARD = 1200;
 const SIDEBAR_WIDTH_KEY = "ohbr.sidebarWidth";
 const SIDEBAR_HIDDEN_KEY = "ohbr.sidebarHidden";
 const bookStateKey = (id: string) => `ohbr.book.${id}`;
+const activeThreadKey = (id: string) => `ohbr.activeThread.${id}`;
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_SCALE = 1.4;
@@ -207,6 +208,13 @@ export default function Reader({ bookId }: { bookId: string }) {
     const sharedConv = searchParams?.get("c");
     if (sharedConv) {
       setActive({ kind: "existing", conversationId: sharedConv });
+    } else {
+      try {
+        const storedConv = localStorage.getItem(activeThreadKey(bookId));
+        if (storedConv) {
+          setActive({ kind: "existing", conversationId: storedConv });
+        }
+      } catch {}
     }
 
     setHydrated(true);
@@ -221,6 +229,17 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (!hydrated) return;
     localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden ? "1" : "0");
   }, [sidebarHidden, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (active && active.kind === "existing") {
+        localStorage.setItem(activeThreadKey(bookId), active.conversationId);
+      } else {
+        localStorage.removeItem(activeThreadKey(bookId));
+      }
+    } catch {}
+  }, [active, hydrated, bookId]);
 
   const persistBookState = useCallback(() => {
     const main = mainRef.current;

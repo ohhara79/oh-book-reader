@@ -279,6 +279,25 @@ export default function ConversationPanel({
     setFontZoom((z) =>
       Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 10) / 10),
     );
+  const [fontMenuOpen, setFontMenuOpen] = useState(false);
+  const fontMenuWrapperRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!fontMenuOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      if (!fontMenuWrapperRef.current?.contains(e.target as Node)) {
+        setFontMenuOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setFontMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [fontMenuOpen]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
@@ -1108,36 +1127,62 @@ export default function ConversationPanel({
         )}
         {active && (
           <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              onClick={decFontZoom}
-              disabled={fontZoom <= MIN_ZOOM}
-              title={`Decrease font size (${fontPercent}%)`}
-              aria-label={`Decrease font size, currently ${fontPercent}%`}
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
-            >
-              <span aria-hidden="true" className="text-[11px] leading-none">
-                A−
-              </span>
-            </button>
-            <span
-              className="min-w-[2.5rem] text-center text-[10px] tabular-nums text-zinc-500"
-              aria-hidden="true"
-            >
-              {fontPercent}%
-            </span>
-            <button
-              type="button"
-              onClick={incFontZoom}
-              disabled={fontZoom >= MAX_ZOOM}
-              title={`Increase font size (${fontPercent}%)`}
-              aria-label={`Increase font size, currently ${fontPercent}%`}
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
-            >
-              <span aria-hidden="true" className="text-[13px] leading-none">
-                A+
-              </span>
-            </button>
+            <div ref={fontMenuWrapperRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setFontMenuOpen((o) => !o)}
+                title={`Font size (${fontPercent}%)`}
+                aria-haspopup="dialog"
+                aria-expanded={fontMenuOpen}
+                aria-label={`Font size, currently ${fontPercent}%`}
+                className="inline-flex h-7 w-7 items-baseline justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
+              >
+                <span aria-hidden="true" className="text-[10px] leading-none">
+                  A
+                </span>
+                <span aria-hidden="true" className="text-[13px] leading-none">
+                  a
+                </span>
+              </button>
+              {fontMenuOpen && (
+                <div
+                  role="dialog"
+                  aria-label="Font size"
+                  className="absolute right-0 top-full z-10 mt-1 flex items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <button
+                    type="button"
+                    onClick={decFontZoom}
+                    disabled={fontZoom <= MIN_ZOOM}
+                    title={`Decrease font size (${fontPercent}%)`}
+                    aria-label={`Decrease font size, currently ${fontPercent}%`}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                  >
+                    <span aria-hidden="true" className="text-[11px] leading-none">
+                      A−
+                    </span>
+                  </button>
+                  <span
+                    className="min-w-[2.5rem] text-center text-[10px] tabular-nums text-zinc-500"
+                    aria-hidden="true"
+                  >
+                    {fontPercent}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={incFontZoom}
+                    disabled={fontZoom >= MAX_ZOOM}
+                    title={`Increase font size (${fontPercent}%)`}
+                    aria-label={`Increase font size, currently ${fontPercent}%`}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                  >
+                    <span aria-hidden="true" className="text-[13px] leading-none">
+                      A+
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
             {conversationId && rawConversation && (
               <>
                 <button

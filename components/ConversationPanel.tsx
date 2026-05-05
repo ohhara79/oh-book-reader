@@ -1158,7 +1158,7 @@ export default function ConversationPanel({
                 <div
                   role="dialog"
                   aria-label="Font size"
-                  className="absolute right-0 top-full z-10 mt-1 flex items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+                  className="absolute right-0 top-full z-10 mt-1 flex w-56 items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
                 >
                   <button
                     type="button"
@@ -1166,14 +1166,29 @@ export default function ConversationPanel({
                     disabled={fontZoom <= MIN_ZOOM}
                     title={`Decrease font size (${fontPercent}%)`}
                     aria-label={`Decrease font size, currently ${fontPercent}%`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
                   >
                     <span aria-hidden="true" className="text-[11px] leading-none">
                       A−
                     </span>
                   </button>
+                  <input
+                    type="range"
+                    min={MIN_ZOOM}
+                    max={MAX_ZOOM}
+                    step={ZOOM_STEP}
+                    value={fontZoom}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (!Number.isFinite(n)) return;
+                      setFontZoom(Math.round(n * 10) / 10);
+                    }}
+                    title={`Font size (${fontPercent}%)`}
+                    aria-label={`Font size, currently ${fontPercent}%`}
+                    className="h-1 min-w-0 flex-1 cursor-pointer accent-zinc-500 dark:accent-zinc-400"
+                  />
                   <span
-                    className="min-w-[2.5rem] text-center text-[10px] tabular-nums text-zinc-500"
+                    className="min-w-[2.5rem] shrink-0 text-center text-[10px] tabular-nums text-zinc-500"
                     aria-hidden="true"
                   >
                     {fontPercent}%
@@ -1184,7 +1199,7 @@ export default function ConversationPanel({
                     disabled={fontZoom >= MAX_ZOOM}
                     title={`Increase font size (${fontPercent}%)`}
                     aria-label={`Increase font size, currently ${fontPercent}%`}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
                   >
                     <span aria-hidden="true" className="text-[13px] leading-none">
                       A+

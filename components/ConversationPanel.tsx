@@ -281,6 +281,7 @@ export default function ConversationPanel({
     );
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const fontMenuWrapperRef = useRef<HTMLDivElement>(null);
+  const fontMenuPopoverRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!fontMenuOpen) return;
     function onMouseDown(e: MouseEvent) {
@@ -297,6 +298,24 @@ export default function ConversationPanel({
       document.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("keydown", onKeyDown);
     };
+  }, [fontMenuOpen]);
+  useLayoutEffect(() => {
+    if (!fontMenuOpen) return;
+    const adjust = () => {
+      const el = fontMenuPopoverRef.current;
+      if (!el) return;
+      el.style.transform = "";
+      const rect = el.getBoundingClientRect();
+      const padding = 8;
+      let shift = 0;
+      if (rect.left < padding) shift = padding - rect.left;
+      else if (rect.right > window.innerWidth - padding)
+        shift = window.innerWidth - padding - rect.right;
+      if (shift !== 0) el.style.transform = `translateX(${shift}px)`;
+    };
+    adjust();
+    window.addEventListener("resize", adjust);
+    return () => window.removeEventListener("resize", adjust);
   }, [fontMenuOpen]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -1228,6 +1247,7 @@ export default function ConversationPanel({
               </button>
               {fontMenuOpen && (
                 <div
+                  ref={fontMenuPopoverRef}
                   role="dialog"
                   aria-label="Font size"
                   className="absolute right-0 top-full z-10 mt-1 flex w-56 items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"

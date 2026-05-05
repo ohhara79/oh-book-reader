@@ -1298,13 +1298,18 @@ export default function ConversationPanel({
                 submitMemo();
                 return;
               }
-              // Touch-primary devices have no Shift+Enter on soft keyboards;
+              // Touch devices have no Shift+Enter on soft keyboards;
               // let Enter insert a newline and rely on the Ask button to send.
+              // Detection is permissive on purpose: the compound
+              // (hover: none) and (pointer: coarse) query is unreliable on
+              // some Android browsers and webviews. Any touch signal counts.
               if (
                 e.key === "Enter" &&
                 !e.shiftKey &&
                 typeof window !== "undefined" &&
-                window.matchMedia("(hover: none) and (pointer: coarse)").matches
+                (window.matchMedia("(pointer: coarse)").matches ||
+                  window.matchMedia("(hover: none)").matches ||
+                  (navigator.maxTouchPoints ?? 0) > 0)
               ) {
                 return;
               }

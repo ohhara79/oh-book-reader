@@ -523,6 +523,20 @@ export default function ConversationPanel({
     listScrollRestoredRef.current = true;
   }, [active, initialListScrollTop]);
 
+  useLayoutEffect(() => {
+    const ta = composerRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const styles = getComputedStyle(ta);
+    const lineHeight =
+      parseFloat(styles.lineHeight) ||
+      parseFloat(styles.fontSize) * 1.5;
+    const paddingY =
+      parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+    const max = lineHeight * 8 + paddingY;
+    ta.style.height = Math.min(ta.scrollHeight, max) + "px";
+  }, [question, threadFontSize]);
+
   const exportMarkdown = useMemo(() => {
     if (!rawConversation) return "";
     return conversationToMarkdown({
@@ -1382,7 +1396,7 @@ export default function ConversationPanel({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             disabled={busy}
-            rows={3}
+            rows={1}
             placeholder="Write a memo or ask a question. Markdown + math supported. Paste, drop, or attach images and text files."
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
             style={{ fontSize: threadFontSize }}

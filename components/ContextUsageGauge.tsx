@@ -36,7 +36,7 @@ export default function ContextUsageGauge({ usage, model }: Props) {
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label={`Context used ${pctLabel}`}
-      className="mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+      className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
     >
       <div
         style={{ width: `${pct * 100}%` }}

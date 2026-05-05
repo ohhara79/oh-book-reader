@@ -1706,7 +1706,7 @@ export default function ConversationPanel({
           {latestUsage && (
             <ContextUsageGauge usage={latestUsage} model={MODEL_NAME} />
           )}
-          <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="mt-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <button
                 type="button"

@@ -893,7 +893,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       : "fixed inset-0 z-50 md:static md:z-auto md:shrink-0 md:w-[var(--sidebar-w)]"
     : sidebarHidden
       ? "hidden"
-      : "hidden md:block md:shrink-0 md:w-[var(--sidebar-w)]";
+      : "absolute inset-0 z-30 md:static md:z-auto md:block md:shrink-0 md:w-[var(--sidebar-w)]";
   const asideClass = `${layoutClass} w-full overflow-auto border-l border-zinc-200 bg-white print:!static print:!z-auto print:!block print:!w-full print:!overflow-visible print:!border-0 dark:border-zinc-800 dark:bg-black`;
 
   const asideStyle = {
@@ -1056,7 +1056,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 return !h;
               });
             }}
-            className="ml-3 hidden h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 md:inline-flex dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="ml-1 inline-flex h-8 items-center rounded border px-2 hover:bg-zinc-100 active:bg-zinc-200 md:ml-3 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
             aria-label={sidebarHidden ? "Show conversation panel" : "Hide conversation panel"}
             title={sidebarHidden ? "Show panel (\\)" : "Hide panel (\\)"}
           >
@@ -1078,7 +1078,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+      <div className="relative flex flex-1 overflow-hidden print:block print:overflow-visible">
         <main
           ref={mainRef}
           tabIndex={-1}
@@ -1146,7 +1146,11 @@ export default function Reader({ bookId }: { bookId: string }) {
             </div>
           </Document>
         </main>
-        {!sidebarHidden && <Splitter onDrag={onSplitterDrag} />}
+        {!sidebarHidden && (
+          <div className="hidden md:contents">
+            <Splitter onDrag={onSplitterDrag} />
+          </div>
+        )}
         <aside className={asideClass} style={asideStyle}>
           <ConversationPanel
             key={

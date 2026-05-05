@@ -1012,7 +1012,11 @@ export default function ConversationPanel({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 px-3 py-1 text-sm print:hidden dark:border-zinc-800">
         <div
           className={
-            showThreadListControls ? "min-w-0 shrink-0" : "min-w-0 flex-1"
+            showThreadListControls
+              ? "min-w-0 shrink-0"
+              : titleExpanded
+                ? "min-w-0 basis-full sm:flex-1 sm:basis-auto"
+                : "min-w-0 flex-1"
           }
         >
           {rawConversation ? (

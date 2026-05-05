@@ -1131,6 +1131,50 @@ export default function ConversationPanel({
         )}
         {active && (
           <div className="ml-auto flex items-center gap-1">
+            {conversationId && rawConversation && (
+              <button
+                type="button"
+                onClick={deleteConversation}
+                disabled={busy || deleting}
+                title={deleting ? "Deleting…" : "Delete (Del)"}
+                aria-label={deleting ? "Deleting" : "Delete"}
+                className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+              >
+                {deleting ? (
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    className="animate-spin"
+                    aria-hidden="true"
+                  >
+                    <path d="M14 8a6 6 0 1 1-6-6" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 3.5h4" />
+                    <path d="M2.5 5.5h11" />
+                    <path d="M4.5 5.5l0.6 7.5a1 1 0 0 0 1 0.9h3.8a1 1 0 0 0 1-0.9l0.6-7.5" />
+                    <path d="M6.8 8v3.5" />
+                    <path d="M9.2 8v3.5" />
+                  </svg>
+                )}
+              </button>
+            )}
             <div ref={fontMenuWrapperRef} className="relative">
               <button
                 type="button"
@@ -1214,48 +1258,6 @@ export default function ConversationPanel({
             </div>
             {conversationId && rawConversation && (
               <>
-                <button
-                  type="button"
-                  onClick={deleteConversation}
-                  disabled={busy || deleting}
-                  title={deleting ? "Deleting…" : "Delete (Del)"}
-                  aria-label={deleting ? "Deleting" : "Delete"}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
-                >
-                  {deleting ? (
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      className="animate-spin"
-                      aria-hidden="true"
-                    >
-                      <path d="M14 8a6 6 0 1 1-6-6" />
-                    </svg>
-                  ) : (
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M6 3.5h4" />
-                      <path d="M2.5 5.5h11" />
-                      <path d="M4.5 5.5l0.6 7.5a1 1 0 0 0 1 0.9h3.8a1 1 0 0 0 1-0.9l0.6-7.5" />
-                      <path d="M6.8 8v3.5" />
-                      <path d="M9.2 8v3.5" />
-                    </svg>
-                  )}
-                </button>
                 <button
                   type="button"
                   onClick={onDownloadThread}

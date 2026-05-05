@@ -554,7 +554,7 @@ export default function ConversationPanel({
       parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
     const max = lineHeight * 8 + paddingY;
     ta.style.height = Math.min(ta.scrollHeight, max) + "px";
-  }, [question, threadFontSize]);
+  }, [question]);
 
   const exportMarkdown = useMemo(() => {
     if (!rawConversation) return "";
@@ -1454,7 +1454,6 @@ export default function ConversationPanel({
             rows={1}
             aria-label="Memo or question"
             className="w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
-            style={{ fontSize: threadFontSize }}
             onKeyDown={(e) => {
               if (e.key === "Escape" && !e.nativeEvent.isComposing) {
                 e.preventDefault();

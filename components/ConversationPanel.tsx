@@ -935,7 +935,7 @@ export default function ConversationPanel({
 
   return (
     <div className="flex h-full flex-col print:h-auto">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-zinc-200 px-4 py-1.5 text-sm print:hidden dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 px-3 py-1 text-sm print:hidden dark:border-zinc-800">
         <div
           className={
             showThreadListControls ? "min-w-0 shrink-0" : "min-w-0 flex-1"
@@ -1211,7 +1211,7 @@ export default function ConversationPanel({
           }
           lastScrollTopRef.current = newScrollTop;
         }}
-        className="flex-1 overflow-auto px-4 py-3 outline-none print:overflow-visible"
+        className="flex-1 overflow-auto px-3 py-2 outline-none print:overflow-visible"
       >
         {isEmpty ? (
           totalThreadCount === 0 ? (
@@ -1244,7 +1244,7 @@ export default function ConversationPanel({
             </div>
           )
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {active?.kind === "new" && <PreviewBox capture={active.capture} />}
             {active?.kind === "existing" && existingCapture && (
               <PreviewBox capture={existingCapture} />
@@ -1264,7 +1264,7 @@ export default function ConversationPanel({
           </div>
         )}
         {error && (
-          <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-700 print:hidden dark:bg-red-950 dark:text-red-300">
+          <p className="mt-2 rounded bg-red-50 p-2 text-xs text-red-700 print:hidden dark:bg-red-950 dark:text-red-300">
             {error}
           </p>
         )}
@@ -1291,7 +1291,7 @@ export default function ConversationPanel({
             setDragActive(false);
             void addFiles(files);
           }}
-          className={`border-t p-3 transition-colors print:hidden ${
+          className={`border-t p-2 transition-colors print:hidden ${
             dragActive
               ? "border-zinc-400 bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900/60"
               : "border-zinc-200 dark:border-zinc-800"
@@ -1965,7 +1965,7 @@ function MessageBubble({
 }) {
   if (m.role === "memo") {
     return (
-      <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+      <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm dark:border-amber-900 dark:bg-amber-950/40">
         <div className="mb-1 flex items-center justify-between gap-2">
           <p className="text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-400">
             memo · {formatTimestamp(m.created_at)}
@@ -1988,7 +1988,7 @@ function MessageBubble({
   const isUser = m.role === "user";
   return (
     <div
-      className={`rounded p-3 text-sm ${
+      className={`rounded p-2 text-sm ${
         isUser
           ? "ml-6 bg-zinc-100 dark:bg-zinc-800"
           : "mr-6 bg-blue-50 dark:bg-blue-950/50"

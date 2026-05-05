@@ -1679,7 +1679,7 @@ export default function ConversationPanel({
           )}
           {previewEnabled && deferredTrimmed && (
             <div
-              className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 text-sm dark:border-zinc-800 dark:bg-zinc-900"
+              className="mt-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-900"
               style={{ fontSize: threadFontSize }}
             >
               <p className="mb-1 text-[0.7143em] uppercase tracking-wide text-zinc-500">

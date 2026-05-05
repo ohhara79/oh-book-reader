@@ -533,6 +533,27 @@ export default function ConversationPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
+  useEffect(() => {
+    if (!active) return;
+    let poppedByBrowser = false;
+    window.history.pushState({ __threadModal: true }, "");
+    const onPop = () => {
+      poppedByBrowser = true;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (
+        !poppedByBrowser &&
+        (window.history.state as { __threadModal?: boolean } | null)
+          ?.__threadModal
+      ) {
+        window.history.back();
+      }
+    };
+  }, [!!active]);
+
   const listScrollRestoredRef = useRef(false);
   useLayoutEffect(() => {
     if (active || listScrollRestoredRef.current) return;

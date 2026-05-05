@@ -11,7 +11,7 @@ In the conversation thread view header, font resize is currently three inline el
 - Existing dropdown patterns: `AppMenu.tsx:19` and `IconMenu` in `ThreadList.tsx:487` (both manage open state, click-outside, and Escape).
 
 ## Design
-**Trigger button** — single `h-7 w-7` icon button matching its toolbar siblings. Renders an `Aa` glyph (small `A` + larger `A`) so it visually communicates "text size", staying in the existing text-based vocabulary used by the current `A−` / `A+` buttons.
+**Trigger button** — single `h-7 w-7` icon button matching its toolbar siblings. Renders a 16×16 inline SVG of two `A` glyphs (small + large) drawn with the same `strokeWidth="1.5"` round-cap stroke style as the sibling delete/download/share/close icons, so the toolbar reads as a uniform set of icons rather than a mix of text and SVG.
 
 **Popover body** — anchored under the trigger (`absolute right-0 top-full mt-1`), styled like `IconMenu`'s panel (`rounded border border-zinc-200 bg-white shadow-md` + dark variants). Inside: the current `A−`, `{fontPercent}%`, `A+` controls reused verbatim — same handlers, same disabled states, same aria labels. This preserves the existing interaction and avoids re-deriving min/max/step logic.
 
@@ -28,7 +28,7 @@ In the conversation thread view header, font resize is currently three inline el
 
 ## Verification
 1. `npm run dev`, open a conversation thread.
-2. Header now shows a single `Aa` button before delete/download/share/close.
+2. Header now shows a single SVG icon button (two A's, small + large) before delete/download/share/close.
 3. Click it → popover opens with `A− 100% A+`. Clicking outside or pressing `Escape` closes it.
 4. `A−` / `A+` adjust font size; disabled at 70% and 150% respectively; percentage updates live.
 5. Reload — font size persists (localStorage).

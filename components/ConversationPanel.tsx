@@ -1135,14 +1135,24 @@ export default function ConversationPanel({
                 aria-haspopup="dialog"
                 aria-expanded={fontMenuOpen}
                 aria-label={`Font size, currently ${fontPercent}%`}
-                className="inline-flex h-7 w-7 items-baseline justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
+                className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
               >
-                <span aria-hidden="true" className="text-[10px] leading-none">
-                  A
-                </span>
-                <span aria-hidden="true" className="text-[13px] leading-none">
-                  a
-                </span>
+                <svg
+                  viewBox="0 0 16 16"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M1.5 13 L3.5 7 L5.5 13" />
+                  <path d="M2.35 10.5 L4.65 10.5" />
+                  <path d="M8 13 L11 3 L14 13" />
+                  <path d="M9.1 9.5 L12.9 9.5" />
+                </svg>
               </button>
               {fontMenuOpen && (
                 <div

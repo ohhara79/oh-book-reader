@@ -41,7 +41,7 @@ function MathMarkdown({
 
   return (
     <div
-      className="prose prose-sm max-w-none dark:prose-invert"
+      className="prose prose-sm max-w-none dark:prose-invert prose-p:my-2 prose-p:leading-snug prose-headings:my-2 prose-headings:leading-snug prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-li:leading-snug"
       style={fontSize ? { fontSize } : undefined}
     >
       <ReactMarkdown

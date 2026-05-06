@@ -1,6 +1,6 @@
 # oh-book-reader
 
-A single-user PDF reader with Claude-powered Q&A on selected regions. Open a PDF, draw a box around any text/figure/equation across one or more pages, and ask Claude follow-up questions about that excerpt. Everything lives on the local filesystem under `./data/` — no database.
+A single-user PDF reader with Claude-powered Q&A on selected regions. Open a PDF, draw a box around any text/figure/equation across one or more pages, and ask Claude follow-up questions about that excerpt — answers render with KaTeX math, Mermaid diagrams, GFM tables and code, and you can attach images in the composer. Everything lives on the local filesystem under `./data/` — no database.
 
 ![oh-book-reader screenshot](docs/examples/oh-book-reader.png)
 
@@ -26,7 +26,7 @@ npm install
 
 ### Optional: `.env.local`
 
-You only need this if `npm run dev` later fails with `Claude Code native binary not found`. In that case, create `.env.local` pointing at your `claude` executable:
+The app finds the `claude` binary automatically — first via the bundled glibc/musl SDK binaries, then via `which claude` (see `lib/claude.ts:30-57`). You only need `.env.local` in the rare case that resolution fails and `npm run dev` reports `Claude Code native binary not found`. Then create `.env.local` pointing at your `claude` executable:
 
 ```bash
 # .env.local
@@ -61,6 +61,8 @@ data/books/<book_id>/
   selections/<sel_id>.json + <sel_id>_<page>.png
   conversations/<conv_id>.json
 ```
+
+(In the UI these conversations are surfaced as **threads** — same thing, two names.)
 
 The directory is created on first upload. To wipe all state, delete `./data/`.
 

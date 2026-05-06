@@ -14,6 +14,10 @@ export function sseFrame(payload: SsePayload): Uint8Array {
   return enc.encode(`data: ${JSON.stringify(payload)}\n\n`);
 }
 
+export function sseComment(text: string): Uint8Array {
+  return enc.encode(`: ${text}\n\n`);
+}
+
 export const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
   "Cache-Control": "no-cache, no-transform",

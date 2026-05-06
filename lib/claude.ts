@@ -131,6 +131,7 @@ export async function* askClaude({
   const result = query({ prompt: promptStream, options });
 
   let assembled = "";
+  let gotResult = false;
 
   try {
     for await (const msg of result) {
@@ -157,6 +158,7 @@ export async function* askClaude({
       }
 
       if (msg.type === "result") {
+        gotResult = true;
         const r = msg as {
           subtype?: string;
           is_error?: boolean;
@@ -198,6 +200,15 @@ export async function* askClaude({
         yield { kind: "done", fullText: assembled };
         return;
       }
+    }
+    if (!gotResult) {
+      yield {
+        kind: "error",
+        message: formatErrorWithStderr(
+          "Claude SDK iterator ended without a result message",
+          stderrChunks,
+        ),
+      };
     }
   } catch (err) {
     yield {

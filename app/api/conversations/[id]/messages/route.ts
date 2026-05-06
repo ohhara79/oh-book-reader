@@ -12,7 +12,7 @@ import {
   readSelectionImage,
 } from "@/lib/store";
 import { askClaude } from "@/lib/claude";
-import { SSE_HEADERS, sseFrame } from "@/lib/sse";
+import { SSE_HEADERS, sseComment, sseFrame } from "@/lib/sse";
 import {
   attachmentBlocks as buildAttachmentBlocks,
   buildMemoBlocks,
@@ -109,6 +109,11 @@ export async function POST(
   const conv = (await getConversation(bookId, conversationId)) as Conversation & {
     session_id?: string;
   };
+  console.log("[ask] enter", {
+    conversationId,
+    sessionId: conv.session_id,
+    sawSelection: !conv.session_id,
+  });
 
   const memos = unsentMemos(conv.messages);
   const memoBlocks = buildMemoBlocks(memos);
@@ -160,6 +165,15 @@ export async function POST(
         sseFrame({ type: "meta", conversationId: conv.id }),
       );
 
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(sseComment("keepalive"));
+        } catch {
+          // controller already closed (client aborted) — interval will be
+          // cleared in the finally block below.
+        }
+      }, 15_000);
+
       type AttemptResult = {
         assistantText: string;
         sessionId: string | undefined;
@@ -178,6 +192,8 @@ export async function POST(
         let assistantUsage: TurnUsage | undefined;
         let errorMessage: string | undefined;
         let sawDelta = false;
+        const runStart = Date.now();
+        console.log("[ask] runOnce start", { resume: Boolean(resumeId) });
         try {
           for await (const ev of askClaude({
             content,
@@ -214,6 +230,12 @@ export async function POST(
             );
           }
         }
+        console.log("[ask] runOnce end", {
+          sawDelta,
+          hasError: Boolean(errorMessage),
+          assistantChars: assistantText.length,
+          ms: Date.now() - runStart,
+        });
         return { assistantText, sessionId, assistantUsage, errorMessage, sawDelta };
       }
 
@@ -233,6 +255,7 @@ export async function POST(
           // Resume failed before any output streamed. Rebuild context from
           // the persisted conversation JSON and retry without resume so the
           // SDK starts a fresh session.
+          console.log("[ask] fallback: rebuilding context");
           const promptSpans = await loadSelectionAsPromptSpans(
             bookId,
             conv.selection_id,
@@ -281,7 +304,12 @@ export async function POST(
           );
         }
         controller.enqueue(sseFrame({ type: "done" }));
+        console.log("[ask] done", {
+          conversationId,
+          totalMs: Date.now() - userCreatedAt,
+        });
       } catch (err) {
+        console.error("[ask] outer catch", err);
         controller.enqueue(
           sseFrame({
             type: "error",
@@ -289,6 +317,7 @@ export async function POST(
           }),
         );
       } finally {
+        clearInterval(keepAlive);
         controller.close();
       }
     },

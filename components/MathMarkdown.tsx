@@ -11,6 +11,17 @@ import MermaidDiagram from "./MermaidDiagram";
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];
 
+// remark-math@6 only treats $$…$$ as display math when the fence spans
+// multiple lines; single-line $$X$$ becomes inline math, where KaTeX rejects
+// display-only commands like \tag{…}. Promote single-line $$…$$ to the
+// multi-line form so the parser classifies them as display blocks.
+function promoteDisplayMath(input: string): string {
+  return input.replace(
+    /(^|[^\\])\$\$((?:(?!\$\$)[^\n])+)\$\$/g,
+    (_, pre, body) => `${pre}\n\n$$\n${body}\n$$\n\n`,
+  );
+}
+
 function MathMarkdown({
   text,
   streaming = false,
@@ -20,6 +31,8 @@ function MathMarkdown({
   streaming?: boolean;
   fontSize?: string;
 }) {
+  const normalizedText = useMemo(() => promoteDisplayMath(text), [text]);
+
   const components = useMemo<Components>(
     () => ({
       pre({ children, ...rest }) {
@@ -49,7 +62,7 @@ function MathMarkdown({
         rehypePlugins={rehypePlugins}
         components={components}
       >
-        {text}
+        {normalizedText}
       </ReactMarkdown>
     </div>
   );

@@ -732,12 +732,22 @@ export default function Reader({ bookId }: { bookId: string }) {
       });
     },
     onCommit: (z) => {
-      if (!pinch) {
+      // No actual scale change — clear pinch and bail without queuing
+      // a scroll target or a spinner.
+      if (z === scaleRef.current) {
+        setPinch(null);
+        return;
+      }
+      // The pinch state is only set from rAF-flushed onChange. Quick
+      // gestures (under a frame) or unflushed renders can land here with
+      // pinch still null; recompute the origin on the spot — no transform
+      // has been applied, so it matches what onChange would have stored.
+      const anchor = pinch ?? computePinchOrigin();
+      if (!anchor) {
+        setPinch(null);
         handleScaleChange(z);
         return;
       }
-      // Mark every currently-mounted visible page as loading so PageSlot
-      // shows a spinner during the brief re-rasterization window.
       const loading = new Set<number>();
       for (let n = renderWindow.start; n <= renderWindow.end; n++) {
         const wrapper = pageWrapperRefs.current.get(n);
@@ -746,8 +756,8 @@ export default function Reader({ bookId }: { bookId: string }) {
       const startScale = scaleRef.current;
       const ratio = z / startScale;
       pendingPinchScrollRef.current = {
-        targetX: pinch.originX * ratio,
-        targetY: pinch.originY * ratio,
+        targetX: anchor.originX * ratio,
+        targetY: anchor.originY * ratio,
       };
       setPagesLoading(loading);
       setPinch(null);

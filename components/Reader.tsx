@@ -682,11 +682,11 @@ export default function Reader({ bookId }: { bookId: string }) {
         case "+":
         case "=":
           e.preventDefault();
-          stepZoom(0.2);
+          stepZoom(0.1);
           return;
         case "-":
           e.preventDefault();
-          stepZoom(-0.2);
+          stepZoom(-0.1);
           return;
         case "0":
           e.preventDefault();
@@ -1093,7 +1093,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               >
                 <button
                   type="button"
-                  onClick={() => stepScale(-0.2)}
+                  onClick={() => stepScale(-0.1)}
                   disabled={scale <= SCALE_MIN}
                   title={`Zoom out (${Math.round(scale * 100)}%)`}
                   aria-label={`Zoom out, currently ${Math.round(scale * 100)}%`}
@@ -1136,7 +1136,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => stepScale(0.2)}
+                  onClick={() => stepScale(0.1)}
                   disabled={scale >= SCALE_MAX}
                   title={`Zoom in (${Math.round(scale * 100)}%)`}
                   aria-label={`Zoom in, currently ${Math.round(scale * 100)}%`}

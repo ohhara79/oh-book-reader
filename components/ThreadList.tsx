@@ -279,7 +279,7 @@ type Props = {
   sortedRows: Row[];
   filter: FilterMode;
   currentPage: number;
-  fontSize?: string;
+  fontZoom?: number;
   onOpen: (conversationId: string) => void;
   onHover?: (selectionId: string | null, pages: number[]) => void;
   highlightedSelectionId?: string | null;
@@ -292,7 +292,7 @@ export default function ThreadList({
   sortedRows,
   filter,
   currentPage,
-  fontSize,
+  fontZoom,
   onOpen,
   onHover,
   highlightedSelectionId = null,
@@ -342,10 +342,7 @@ export default function ThreadList({
 
   if (visibleRows.length === 0) {
     return (
-      <div
-        className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700"
-        style={fontSize ? { fontSize } : undefined}
-      >
+      <div className="rounded border border-dashed border-zinc-300 p-3 text-center text-sm text-zinc-500 dark:border-zinc-700">
         {filter === "page" ? (
           <p>No threads on page {currentPage}.</p>
         ) : (
@@ -466,7 +463,6 @@ export default function ThreadList({
                 ? "border-zinc-400 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900"
                 : "border-zinc-200 bg-white hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
             }`}
-            style={fontSize ? { fontSize } : undefined}
           >
             <ThreadHeadingRow
               title={r.conv.title}
@@ -474,6 +470,7 @@ export default function ThreadList({
               updatedAt={r.conv.updated_at}
               askCount={r.conv.askCount}
               memoCount={r.conv.memoCount}
+              fontZoom={fontZoom}
             />
           </button>
         </li>

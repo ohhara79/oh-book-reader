@@ -70,6 +70,7 @@ function readComposerPreviewEnabled(): boolean {
 }
 
 const FONT_ZOOM_KEY = "ohbr.messageFontZoom";
+const LIST_FONT_ZOOM_KEY = "ohbr.threadListFontZoom";
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 5.0;
 const ZOOM_STEP = 0.1;
@@ -214,8 +215,16 @@ function FontZoomMenu({
 }
 
 function readMessageFontZoom(): number {
+  return readZoomFromKey(FONT_ZOOM_KEY);
+}
+
+function readListFontZoom(): number {
+  return readZoomFromKey(LIST_FONT_ZOOM_KEY);
+}
+
+function readZoomFromKey(key: string): number {
   try {
-    const raw = localStorage.getItem(FONT_ZOOM_KEY);
+    const raw = localStorage.getItem(key);
     if (raw === null) return DEFAULT_ZOOM;
     const n = Number(raw);
     if (!Number.isFinite(n)) return DEFAULT_ZOOM;
@@ -420,16 +429,39 @@ export default function ConversationPanel({
     setFontZoom((z) =>
       Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 10) / 10),
     );
+  const [listFontZoom, setListFontZoom] = useState<number>(() =>
+    readListFontZoom(),
+  );
+  useEffect(() => {
+    localStorage.setItem(LIST_FONT_ZOOM_KEY, String(listFontZoom));
+  }, [listFontZoom]);
+  const listFontZoomRef = useRef(listFontZoom);
+  useEffect(() => {
+    listFontZoomRef.current = listFontZoom;
+  }, [listFontZoom]);
+  const decListFontZoom = () =>
+    setListFontZoom((z) =>
+      Math.max(MIN_ZOOM, Math.round((z - ZOOM_STEP) * 10) / 10),
+    );
+  const incListFontZoom = () =>
+    setListFontZoom((z) =>
+      Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 10) / 10),
+    );
   const scrollerRef = useRef<HTMLDivElement>(null);
   usePinchZoom(scrollerRef, {
-    getCurrent: () => fontZoomRef.current,
+    getCurrent: () =>
+      active === null ? listFontZoomRef.current : fontZoomRef.current,
     min: MIN_ZOOM,
     max: MAX_ZOOM,
-    onChange: setFontZoom,
-    onCommit: (z) =>
-      setFontZoom(
-        Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(z * 10) / 10)),
-      ),
+    onChange: (z) => (active === null ? setListFontZoom(z) : setFontZoom(z)),
+    onCommit: (z) => {
+      const snapped = Math.max(
+        MIN_ZOOM,
+        Math.min(MAX_ZOOM, Math.round(z * 10) / 10),
+      );
+      if (active === null) setListFontZoom(snapped);
+      else setFontZoom(snapped);
+    },
     snapStep: ZOOM_STEP,
   });
   const stickToBottomRef = useRef(true);
@@ -1279,10 +1311,10 @@ export default function ConversationPanel({
         {showThreadListControls && (
           <div className="ml-auto flex items-center gap-1">
             <FontZoomMenu
-              fontZoom={fontZoom}
-              setFontZoom={setFontZoom}
-              decFontZoom={decFontZoom}
-              incFontZoom={incFontZoom}
+              fontZoom={listFontZoom}
+              setFontZoom={setListFontZoom}
+              decFontZoom={decListFontZoom}
+              incFontZoom={incListFontZoom}
             />
             <ThreadListControls
               filter={threadListState.filter}
@@ -1465,10 +1497,7 @@ export default function ConversationPanel({
       >
         {isEmpty ? (
           totalThreadCount === 0 ? (
-            <p
-              className="text-zinc-500"
-              style={{ fontSize: threadFontSize }}
-            >
+            <p className="text-sm text-zinc-500">
               Drag a rectangle (or press and hold on touch) over a region of the
               page to start a thread. Use <strong>Memo</strong> to save your own
               note, or <strong>Ask</strong> to query AI. Memos appear inline
@@ -1481,7 +1510,7 @@ export default function ConversationPanel({
                 sortedRows={threadListState.sortedRows}
                 filter={threadListState.filter}
                 currentPage={pageNum}
-                fontSize={threadFontSize}
+                fontZoom={listFontZoom}
                 onOpen={(id) => {
                   const top = scrollerRef.current?.scrollTop ?? 0;
                   onListScrollSave?.(top);

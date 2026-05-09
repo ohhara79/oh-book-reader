@@ -551,6 +551,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   // ratio before scale changes, restore after layout settles.
   const handleScaleChange = useCallback(
     (next: number) => {
+      if (next === scaleRef.current) return;
       const main = mainRef.current;
       const focused = pageNumRef.current;
       const wrapper = pageWrapperRefs.current.get(focused);
@@ -565,6 +566,13 @@ export default function Reader({ bookId }: { bookId: string }) {
           ? offsetWithin / wrapper.offsetHeight
           : 0;
       }
+      const loading = new Set<number>();
+      for (let n = focused - RENDER_BUFFER; n <= focused + RENDER_BUFFER; n++) {
+        if (n < 1) continue;
+        const w = pageWrapperRefs.current.get(n);
+        if (w?.querySelector("canvas")) loading.add(n);
+      }
+      setPagesLoading(loading);
       setScale(next);
       // After dims update, restore scroll to keep the focused page roughly
       // in the same intra-page position.

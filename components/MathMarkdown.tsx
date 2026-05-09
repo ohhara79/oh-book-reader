@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import MermaidDiagram from "./MermaidDiagram";
+import SvgBlock from "./SvgBlock";
 
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];
@@ -45,6 +46,10 @@ function MathMarkdown({
         if (/(?:^|\s)language-mermaid(?:\s|$)/.test(cls) && !streaming) {
           const src = String(childEl?.props?.children ?? "").replace(/\n$/, "");
           return <MermaidDiagram code={src} />;
+        }
+        if (/(?:^|\s)language-svg(?:\s|$)/.test(cls) && !streaming) {
+          const src = String(childEl?.props?.children ?? "").replace(/\n$/, "");
+          return <SvgBlock code={src} />;
         }
         return <pre {...rest}>{children}</pre>;
       },

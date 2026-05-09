@@ -9,7 +9,6 @@ type Props = {
   height: number;
   mounted: boolean;
   registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
-  loading?: boolean;
   onRendered?: (pageNumber: number) => void;
 };
 
@@ -19,7 +18,6 @@ export default function PageSlot({
   height,
   mounted,
   registerRef,
-  loading,
   onRendered,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -44,25 +42,6 @@ export default function PageSlot({
           renderAnnotationLayer={false}
           onRenderSuccess={() => onRendered?.(pageNumber)}
         />
-      ) : null}
-      {loading ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-zinc-900/40"
-        >
-          <svg
-            viewBox="0 0 16 16"
-            width="32"
-            height="32"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            className="animate-spin text-zinc-500"
-          >
-            <path d="M14 8a6 6 0 1 1-6-6" />
-          </svg>
-        </div>
       ) : null}
     </div>
   );

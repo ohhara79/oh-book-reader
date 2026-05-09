@@ -656,6 +656,42 @@ export default function Reader({ bookId }: { bookId: string }) {
     return () => clearTimeout(t);
   }, [pagesLoading]);
 
+  // Bounds of <main> in viewport coordinates, captured while a pinch
+  // re-render is in flight so the loading overlay can be position:fixed
+  // over the visible PDF area regardless of how far the user has scrolled
+  // within a page.
+  const [mainRect, setMainRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (pagesLoading.size === 0) {
+      setMainRect(null);
+      return;
+    }
+    const main = mainRef.current;
+    if (!main) return;
+    const update = () => {
+      const r = main.getBoundingClientRect();
+      setMainRect({
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+      });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, [pagesLoading]);
+
   useLayoutEffect(() => {
     const target = pendingPinchScrollRef.current;
     if (!target) return;
@@ -1369,7 +1405,6 @@ export default function Reader({ bookId }: { bookId: string }) {
                       height={dims.height}
                       mounted={mounted}
                       registerRef={registerPageRef}
-                      loading={pagesLoading.has(n)}
                       onRendered={clearPageLoading}
                     />
                   );
@@ -1395,6 +1430,33 @@ export default function Reader({ bookId }: { bookId: string }) {
             </div>
           </Document>
         </main>
+        {mainRect && pagesLoading.size > 0 ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed z-30 flex items-center justify-center"
+            style={{
+              left: mainRect.left,
+              top: mainRect.top,
+              width: mainRect.width,
+              height: mainRect.height,
+            }}
+          >
+            <div className="rounded-full bg-white/80 p-3 shadow dark:bg-zinc-900/80">
+              <svg
+                viewBox="0 0 16 16"
+                width="32"
+                height="32"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                className="animate-spin text-zinc-500"
+              >
+                <path d="M14 8a6 6 0 1 1-6-6" />
+              </svg>
+            </div>
+          </div>
+        ) : null}
         {!sidebarHidden && (
           <div className="hidden md:contents">
             <Splitter onDrag={onSplitterDrag} />

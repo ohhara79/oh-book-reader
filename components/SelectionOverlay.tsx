@@ -114,11 +114,6 @@ export default function SelectionOverlay({
   const panSamplesRef = useRef<{ x: number; y: number; t: number }[]>([]);
   const inertiaRafRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-  // Tracks whether selection is armed, in order to drive the overlay's
-  // touch-action. While armed we set it to "none" so vertical motion can't
-  // hand the gesture back to the browser as a native scroll (which would
-  // fire pointercancel and erase the selection rectangle).
-  const [armed, setArmed] = useState(false);
   const [stackPicker, setStackPicker] = useState<StackPicker | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(
     null,
@@ -370,7 +365,6 @@ export default function SelectionOverlay({
     pointerIdRef.current = pointerId;
     dragMovedRef.current = false;
     setDrag({ startX: x, startY: y, x, y, w: 0, h: 0 });
-    setArmed(true);
   }
 
   function clearLongPress() {
@@ -390,10 +384,22 @@ export default function SelectionOverlay({
     panScrollerRef.current = null;
     lastPanRef.current = null;
     panSamplesRef.current = [];
-    setArmed(false);
   }
 
+  const activeTouchPointersRef = useRef<Set<number>>(new Set());
+
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "touch") {
+      activeTouchPointersRef.current.add(e.pointerId);
+      // A second finger means the user is starting a pinch — cancel any
+      // in-progress single-finger selection drag or pan so the pinch hook
+      // on <main> can take over cleanly.
+      if (activeTouchPointersRef.current.size > 1) {
+        resetGesture();
+        setDrag(null);
+        return;
+      }
+    }
     if (!e.isPrimary) return;
     if (e.button !== 0) return;
     setHoverTip(null);
@@ -495,6 +501,9 @@ export default function SelectionOverlay({
   }
 
   async function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "touch") {
+      activeTouchPointersRef.current.delete(e.pointerId);
+    }
     if (
       pointerIdRef.current !== null &&
       e.pointerId !== pointerIdRef.current
@@ -685,6 +694,9 @@ export default function SelectionOverlay({
   }
 
   function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "touch") {
+      activeTouchPointersRef.current.delete(e.pointerId);
+    }
     if (
       pointerIdRef.current !== null &&
       e.pointerId !== pointerIdRef.current
@@ -784,7 +796,7 @@ export default function SelectionOverlay({
       className="absolute inset-0 select-none md:cursor-crosshair"
       style={{
         zIndex: 10,
-        touchAction: armed ? "none" : "pinch-zoom",
+        touchAction: "none",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

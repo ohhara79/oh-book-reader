@@ -11,6 +11,7 @@ import {
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
+import { usePinchZoom } from "@/lib/usePinchZoom";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 import type { Conversation, Turn, TurnUsage } from "@/lib/store";
 import { MODEL_NAME } from "@/lib/contextWindows";
@@ -74,6 +75,143 @@ const MAX_ZOOM = 5.0;
 const ZOOM_STEP = 0.1;
 const DEFAULT_ZOOM = 1.0;
 const BASE_FS_REM = 0.875;
+
+function FontZoomMenu({
+  fontZoom,
+  setFontZoom,
+  decFontZoom,
+  incFontZoom,
+}: {
+  fontZoom: number;
+  setFontZoom: (n: number) => void;
+  decFontZoom: () => void;
+  incFontZoom: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const fontPercent = Math.round(fontZoom * 100);
+
+  useEffect(() => {
+    if (!open) return;
+    function onMouseDown(e: MouseEvent) {
+      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const adjust = () => {
+      const el = popoverRef.current;
+      if (!el) return;
+      el.style.transform = "";
+      const rect = el.getBoundingClientRect();
+      const padding = 8;
+      let shift = 0;
+      if (rect.left < padding) shift = padding - rect.left;
+      else if (rect.right > window.innerWidth - padding)
+        shift = window.innerWidth - padding - rect.right;
+      if (shift !== 0) el.style.transform = `translateX(${shift}px)`;
+    };
+    adjust();
+    window.addEventListener("resize", adjust);
+    return () => window.removeEventListener("resize", adjust);
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title={`Font size (${fontPercent}%)`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`Font size, currently ${fontPercent}%`}
+        className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
+      >
+        <svg
+          viewBox="0 0 16 16"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M1.5 13 L3.5 7 L5.5 13" />
+          <path d="M2.35 10.5 L4.65 10.5" />
+          <path d="M8 13 L11 3 L14 13" />
+          <path d="M9.1 9.5 L12.9 9.5" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          ref={popoverRef}
+          role="dialog"
+          aria-label="Font size"
+          className="absolute right-0 top-full z-10 mt-1 flex w-56 items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+        >
+          <button
+            type="button"
+            onClick={decFontZoom}
+            disabled={fontZoom <= MIN_ZOOM}
+            title={`Decrease font size (${fontPercent}%)`}
+            aria-label={`Decrease font size, currently ${fontPercent}%`}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+          >
+            <span aria-hidden="true" className="text-[11px] leading-none">
+              A−
+            </span>
+          </button>
+          <input
+            type="range"
+            min={MIN_ZOOM}
+            max={MAX_ZOOM}
+            step={ZOOM_STEP}
+            value={fontZoom}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (!Number.isFinite(n)) return;
+              setFontZoom(Math.round(n * 10) / 10);
+            }}
+            title={`Font size (${fontPercent}%)`}
+            aria-label={`Font size, currently ${fontPercent}%`}
+            className="h-1 min-w-0 flex-1 cursor-pointer accent-zinc-500 dark:accent-zinc-400"
+          />
+          <span
+            className="min-w-[2.5rem] shrink-0 text-center text-[10px] tabular-nums text-zinc-500"
+            aria-hidden="true"
+          >
+            {fontPercent}%
+          </span>
+          <button
+            type="button"
+            onClick={incFontZoom}
+            disabled={fontZoom >= MAX_ZOOM}
+            title={`Increase font size (${fontPercent}%)`}
+            aria-label={`Increase font size, currently ${fontPercent}%`}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+          >
+            <span aria-hidden="true" className="text-[13px] leading-none">
+              A+
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function readMessageFontZoom(): number {
   try {
@@ -262,6 +400,10 @@ export default function ConversationPanel({
   useEffect(() => {
     localStorage.setItem(FONT_ZOOM_KEY, String(fontZoom));
   }, [fontZoom]);
+  const fontZoomRef = useRef(fontZoom);
+  useEffect(() => {
+    fontZoomRef.current = fontZoom;
+  }, [fontZoom]);
   const threadFontSize = useMemo(
     () => `${(BASE_FS_REM * fontZoom).toFixed(4)}rem`,
     [fontZoom],
@@ -270,7 +412,6 @@ export default function ConversationPanel({
     () => `${(0.75 * fontZoom).toFixed(4)}rem`,
     [fontZoom],
   );
-  const fontPercent = Math.round(fontZoom * 100);
   const decFontZoom = () =>
     setFontZoom((z) =>
       Math.max(MIN_ZOOM, Math.round((z - ZOOM_STEP) * 10) / 10),
@@ -279,45 +420,18 @@ export default function ConversationPanel({
     setFontZoom((z) =>
       Math.min(MAX_ZOOM, Math.round((z + ZOOM_STEP) * 10) / 10),
     );
-  const [fontMenuOpen, setFontMenuOpen] = useState(false);
-  const fontMenuWrapperRef = useRef<HTMLDivElement>(null);
-  const fontMenuPopoverRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!fontMenuOpen) return;
-    function onMouseDown(e: MouseEvent) {
-      if (!fontMenuWrapperRef.current?.contains(e.target as Node)) {
-        setFontMenuOpen(false);
-      }
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setFontMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [fontMenuOpen]);
-  useLayoutEffect(() => {
-    if (!fontMenuOpen) return;
-    const adjust = () => {
-      const el = fontMenuPopoverRef.current;
-      if (!el) return;
-      el.style.transform = "";
-      const rect = el.getBoundingClientRect();
-      const padding = 8;
-      let shift = 0;
-      if (rect.left < padding) shift = padding - rect.left;
-      else if (rect.right > window.innerWidth - padding)
-        shift = window.innerWidth - padding - rect.right;
-      if (shift !== 0) el.style.transform = `translateX(${shift}px)`;
-    };
-    adjust();
-    window.addEventListener("resize", adjust);
-    return () => window.removeEventListener("resize", adjust);
-  }, [fontMenuOpen]);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  usePinchZoom(scrollerRef, {
+    getCurrent: () => fontZoomRef.current,
+    min: MIN_ZOOM,
+    max: MAX_ZOOM,
+    onChange: setFontZoom,
+    onCommit: (z) =>
+      setFontZoom(
+        Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(z * 10) / 10)),
+      ),
+    snapStep: ZOOM_STEP,
+  });
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -1163,7 +1277,13 @@ export default function ConversationPanel({
           )}
         </div>
         {showThreadListControls && (
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <FontZoomMenu
+              fontZoom={fontZoom}
+              setFontZoom={setFontZoom}
+              decFontZoom={decFontZoom}
+              incFontZoom={incFontZoom}
+            />
             <ThreadListControls
               filter={threadListState.filter}
               setFilter={threadListState.setFilter}
@@ -1218,88 +1338,12 @@ export default function ConversationPanel({
                 )}
               </button>
             )}
-            <div ref={fontMenuWrapperRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setFontMenuOpen((o) => !o)}
-                title={`Font size (${fontPercent}%)`}
-                aria-haspopup="dialog"
-                aria-expanded={fontMenuOpen}
-                aria-label={`Font size, currently ${fontPercent}%`}
-                className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M1.5 13 L3.5 7 L5.5 13" />
-                  <path d="M2.35 10.5 L4.65 10.5" />
-                  <path d="M8 13 L11 3 L14 13" />
-                  <path d="M9.1 9.5 L12.9 9.5" />
-                </svg>
-              </button>
-              {fontMenuOpen && (
-                <div
-                  ref={fontMenuPopoverRef}
-                  role="dialog"
-                  aria-label="Font size"
-                  className="absolute right-0 top-full z-10 mt-1 flex w-56 items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
-                >
-                  <button
-                    type="button"
-                    onClick={decFontZoom}
-                    disabled={fontZoom <= MIN_ZOOM}
-                    title={`Decrease font size (${fontPercent}%)`}
-                    aria-label={`Decrease font size, currently ${fontPercent}%`}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
-                  >
-                    <span aria-hidden="true" className="text-[11px] leading-none">
-                      A−
-                    </span>
-                  </button>
-                  <input
-                    type="range"
-                    min={MIN_ZOOM}
-                    max={MAX_ZOOM}
-                    step={ZOOM_STEP}
-                    value={fontZoom}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      if (!Number.isFinite(n)) return;
-                      setFontZoom(Math.round(n * 10) / 10);
-                    }}
-                    title={`Font size (${fontPercent}%)`}
-                    aria-label={`Font size, currently ${fontPercent}%`}
-                    className="h-1 min-w-0 flex-1 cursor-pointer accent-zinc-500 dark:accent-zinc-400"
-                  />
-                  <span
-                    className="min-w-[2.5rem] shrink-0 text-center text-[10px] tabular-nums text-zinc-500"
-                    aria-hidden="true"
-                  >
-                    {fontPercent}%
-                  </span>
-                  <button
-                    type="button"
-                    onClick={incFontZoom}
-                    disabled={fontZoom >= MAX_ZOOM}
-                    title={`Increase font size (${fontPercent}%)`}
-                    aria-label={`Increase font size, currently ${fontPercent}%`}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
-                  >
-                    <span aria-hidden="true" className="text-[13px] leading-none">
-                      A+
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
+            <FontZoomMenu
+              fontZoom={fontZoom}
+              setFontZoom={setFontZoom}
+              decFontZoom={decFontZoom}
+              incFontZoom={incFontZoom}
+            />
             {conversationId && rawConversation && (
               <>
                 <button
@@ -1416,11 +1460,15 @@ export default function ConversationPanel({
           }
           lastScrollTopRef.current = newScrollTop;
         }}
+        style={{ touchAction: "pan-y" }}
         className="flex-1 overflow-auto px-3 py-2 outline-none print:overflow-visible"
       >
         {isEmpty ? (
           totalThreadCount === 0 ? (
-            <p className="text-sm text-zinc-500">
+            <p
+              className="text-zinc-500"
+              style={{ fontSize: threadFontSize }}
+            >
               Drag a rectangle (or press and hold on touch) over a region of the
               page to start a thread. Use <strong>Memo</strong> to save your own
               note, or <strong>Ask</strong> to query AI. Memos appear inline
@@ -1433,6 +1481,7 @@ export default function ConversationPanel({
                 sortedRows={threadListState.sortedRows}
                 filter={threadListState.filter}
                 currentPage={pageNum}
+                fontSize={threadFontSize}
                 onOpen={(id) => {
                   const top = scrollerRef.current?.scrollTop ?? 0;
                   onListScrollSave?.(top);

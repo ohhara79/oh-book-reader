@@ -22,6 +22,7 @@ import SelectionOverlay, {
 } from "./SelectionOverlay";
 import PageSlot from "./PageSlot";
 import ConversationPanel from "./ConversationPanel";
+import { usePinchZoom } from "@/lib/usePinchZoom";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -592,6 +593,13 @@ export default function Reader({ bookId }: { bookId: string }) {
       handleScaleChange(next);
     }
   };
+
+  usePinchZoom(mainRef, {
+    getCurrent: () => scaleRef.current,
+    min: SCALE_MIN,
+    max: SCALE_MAX,
+    onChange: handleScaleChange,
+  });
 
   useEffect(() => {
     if (!zoomMenuOpen) return;
@@ -1195,6 +1203,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           ref={mainRef}
           tabIndex={-1}
           className="flex-1 overflow-auto bg-zinc-100 p-6 outline-none print:hidden dark:bg-zinc-900"
+          style={{ touchAction: "pan-x pan-y" }}
         >
           <Document
             file={fileProp}

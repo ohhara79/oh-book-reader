@@ -386,19 +386,16 @@ export default function SelectionOverlay({
     panSamplesRef.current = [];
   }
 
-  const activeTouchPointersRef = useRef<Set<number>>(new Set());
-
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "touch") {
-      activeTouchPointersRef.current.add(e.pointerId);
-      // A second finger means the user is starting a pinch — cancel any
-      // in-progress single-finger selection drag or pan so the pinch hook
-      // on <main> can take over cleanly.
-      if (activeTouchPointersRef.current.size > 1) {
-        resetGesture();
-        setDrag(null);
-        return;
-      }
+    if (e.pointerType === "touch" && !e.isPrimary) {
+      // Second-finger touch = pinch beginning. Cancel any in-progress
+      // single-finger long-press / drag / pan so the pinch hook on
+      // <main> can take over cleanly. Stateless: an earlier set-based
+      // counter leaked ids because pointer capture redirected up/cancel
+      // events away from this overlay, so cleanup never ran.
+      resetGesture();
+      setDrag(null);
+      return;
     }
     if (!e.isPrimary) return;
     if (e.button !== 0) return;
@@ -501,9 +498,6 @@ export default function SelectionOverlay({
   }
 
   async function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "touch") {
-      activeTouchPointersRef.current.delete(e.pointerId);
-    }
     if (
       pointerIdRef.current !== null &&
       e.pointerId !== pointerIdRef.current
@@ -694,9 +688,6 @@ export default function SelectionOverlay({
   }
 
   function onPointerCancel(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "touch") {
-      activeTouchPointersRef.current.delete(e.pointerId);
-    }
     if (
       pointerIdRef.current !== null &&
       e.pointerId !== pointerIdRef.current

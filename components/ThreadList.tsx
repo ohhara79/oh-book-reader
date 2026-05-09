@@ -215,7 +215,6 @@ export function ThreadListControls({
       <IconMenu
         open={openMenu === "filter"}
         onOpenChange={(o) => setOpenMenu(o ? "filter" : null)}
-        active={filter !== "page"}
         icon={<FilterIcon />}
         ariaLabel="Filter threads"
         title={`Filter: ${filterLabel}`}
@@ -241,7 +240,6 @@ export function ThreadListControls({
       <IconMenu
         open={openMenu === "sort"}
         onOpenChange={(o) => setOpenMenu(o ? "sort" : null)}
-        active={sort !== "page"}
         icon={<SortIcon />}
         ariaLabel="Sort threads"
         title={`Sort: ${sortLabel}`}
@@ -493,7 +491,6 @@ type IconMenuItem = {
 function IconMenu({
   open,
   onOpenChange,
-  active,
   icon,
   ariaLabel,
   title,
@@ -501,7 +498,6 @@ function IconMenu({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  active: boolean;
   icon: React.ReactNode;
   ariaLabel: string;
   title: string;
@@ -512,11 +508,7 @@ function IconMenu({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className={
-          active
-            ? "inline-flex h-7 w-7 items-center justify-center rounded border border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-black"
-            : "inline-flex h-7 w-7 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800"
-        }
+        className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 dark:hover:text-zinc-100"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={ariaLabel}

@@ -595,11 +595,51 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
   };
 
+  // Live preview during pinch. Avoids re-rasterizing every Page canvas
+  // each frame (which is what scale state updates trigger). The actual
+  // scale only commits at gesture end.
+  const [pinch, setPinch] = useState<{
+    ratio: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+
+  const computePinchOrigin = useCallback((): {
+    originX: number;
+    originY: number;
+  } | null => {
+    const main = mainRef.current;
+    const content = contentRef.current;
+    if (!main || !content) return null;
+    const mainRect = main.getBoundingClientRect();
+    const contentRect = content.getBoundingClientRect();
+    const contentLeftInMain =
+      contentRect.left - mainRect.left + main.scrollLeft;
+    const contentTopInMain =
+      contentRect.top - mainRect.top + main.scrollTop;
+    return {
+      originX: main.scrollLeft + main.clientWidth / 2 - contentLeftInMain,
+      originY: main.scrollTop + main.clientHeight / 2 - contentTopInMain,
+    };
+  }, []);
+
   usePinchZoom(mainRef, {
     getCurrent: () => scaleRef.current,
     min: SCALE_MIN,
     max: SCALE_MAX,
-    onChange: handleScaleChange,
+    onChange: (z) => {
+      setPinch((prev) => {
+        const ratio = z / scaleRef.current;
+        if (prev) return { ...prev, ratio };
+        const origin = computePinchOrigin();
+        if (!origin) return null;
+        return { ratio, ...origin };
+      });
+    },
+    onCommit: (z) => {
+      setPinch(null);
+      handleScaleChange(z);
+    },
     snapStep: SCALE_STEP,
   });
 
@@ -1219,6 +1259,13 @@ export default function Reader({ bookId }: { bookId: string }) {
               style={{
                 width: contentSize.width || undefined,
                 minHeight: contentSize.height || undefined,
+                ...(pinch
+                  ? {
+                      transform: `scale(${pinch.ratio})`,
+                      transformOrigin: `${pinch.originX}px ${pinch.originY}px`,
+                      willChange: "transform",
+                    }
+                  : null),
               }}
             >
               <div className="flex flex-col items-center" style={{ gap: PAGE_GAP_PX }}>

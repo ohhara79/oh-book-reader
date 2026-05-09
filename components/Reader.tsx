@@ -12,6 +12,7 @@ import {
   type CSSProperties,
 } from "react";
 import { Document, pdfjs } from "react-pdf";
+import { flushSync } from "react-dom";
 import type { DocumentProps } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -623,16 +624,6 @@ export default function Reader({ bookId }: { bookId: string }) {
     };
   }, []);
 
-  // Carries the pinch-anchor scroll target across the commit re-render.
-  // Set in onCommit, consumed in the useLayoutEffect below — keeps the
-  // visible content point that was at the viewport center during the
-  // gesture at the viewport center after the new scale lands, with no
-  // mid-paint flash.
-  const pendingPinchScrollRef = useRef<{
-    targetX: number;
-    targetY: number;
-  } | null>(null);
-
   // Pages currently re-rasterizing after a pinch commit. PageSlot shows a
   // spinner overlay while their entry is present; cleared per page when
   // react-pdf fires onRenderSuccess.
@@ -692,32 +683,6 @@ export default function Reader({ bookId }: { bookId: string }) {
     };
   }, [pagesLoading]);
 
-  useLayoutEffect(() => {
-    const target = pendingPinchScrollRef.current;
-    if (!target) return;
-    pendingPinchScrollRef.current = null;
-    const m = mainRef.current;
-    const c = contentRef.current;
-    if (!m || !c) return;
-    const mainRect = m.getBoundingClientRect();
-    const contentRect = c.getBoundingClientRect();
-    const contentLeftInMain =
-      contentRect.left - mainRect.left + m.scrollLeft;
-    const contentTopInMain =
-      contentRect.top - mainRect.top + m.scrollTop;
-    m.scrollTo({
-      left: Math.max(
-        0,
-        target.targetX + contentLeftInMain - m.clientWidth / 2,
-      ),
-      top: Math.max(
-        0,
-        target.targetY + contentTopInMain - m.clientHeight / 2,
-      ),
-      behavior: "auto",
-    });
-  }, [scale]);
-
   usePinchZoom(mainRef, {
     getCurrent: () => scaleRef.current,
     min: SCALE_MIN,
@@ -732,16 +697,14 @@ export default function Reader({ bookId }: { bookId: string }) {
       });
     },
     onCommit: (z) => {
-      // No actual scale change — clear pinch and bail without queuing
-      // a scroll target or a spinner.
+      // No actual scale change — clear pinch and bail.
       if (z === scaleRef.current) {
         setPinch(null);
         return;
       }
-      // The pinch state is only set from rAF-flushed onChange. Quick
-      // gestures (under a frame) or unflushed renders can land here with
-      // pinch still null; recompute the origin on the spot — no transform
-      // has been applied, so it matches what onChange would have stored.
+      // pinch is only set from rAF-flushed onChange; short gestures or
+      // unflushed renders land here with pinch null. computePinchOrigin
+      // reads identical numbers because no transform has been applied.
       const anchor = pinch ?? computePinchOrigin();
       if (!anchor) {
         setPinch(null);
@@ -755,13 +718,32 @@ export default function Reader({ bookId }: { bookId: string }) {
       }
       const startScale = scaleRef.current;
       const ratio = z / startScale;
-      pendingPinchScrollRef.current = {
-        targetX: anchor.originX * ratio,
-        targetY: anchor.originY * ratio,
-      };
-      setPagesLoading(loading);
-      setPinch(null);
-      setScale(z);
+      const targetX = anchor.originX * ratio;
+      const targetY = anchor.originY * ratio;
+
+      // Commit the scale change synchronously so we can read post-zoom
+      // layout and scroll in the same call frame, before the browser
+      // paints or runs scroll anchoring.
+      flushSync(() => {
+        setPagesLoading(loading);
+        setPinch(null);
+        setScale(z);
+      });
+
+      const m = mainRef.current;
+      const c = contentRef.current;
+      if (!m || !c) return;
+      const mainRect = m.getBoundingClientRect();
+      const contentRect = c.getBoundingClientRect();
+      const contentLeftInMain =
+        contentRect.left - mainRect.left + m.scrollLeft;
+      const contentTopInMain =
+        contentRect.top - mainRect.top + m.scrollTop;
+      m.scrollTo({
+        left: Math.max(0, targetX + contentLeftInMain - m.clientWidth / 2),
+        top: Math.max(0, targetY + contentTopInMain - m.clientHeight / 2),
+        behavior: "auto",
+      });
     },
     snapStep: SCALE_STEP,
   });
@@ -1368,7 +1350,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           ref={mainRef}
           tabIndex={-1}
           className="flex-1 overflow-auto bg-zinc-100 p-6 outline-none print:hidden dark:bg-zinc-900"
-          style={{ touchAction: "pan-x pan-y" }}
+          style={{ touchAction: "pan-x pan-y", overflowAnchor: "none" }}
         >
           <Document
             file={fileProp}

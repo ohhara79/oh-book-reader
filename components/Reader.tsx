@@ -623,6 +623,42 @@ export default function Reader({ bookId }: { bookId: string }) {
     };
   }, []);
 
+  // Carries the pinch-anchor scroll target across the commit re-render.
+  // Set in onCommit, consumed in the useLayoutEffect below — keeps the
+  // visible content point that was at the viewport center during the
+  // gesture at the viewport center after the new scale lands, with no
+  // mid-paint flash.
+  const pendingPinchScrollRef = useRef<{
+    targetX: number;
+    targetY: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const target = pendingPinchScrollRef.current;
+    if (!target) return;
+    pendingPinchScrollRef.current = null;
+    const m = mainRef.current;
+    const c = contentRef.current;
+    if (!m || !c) return;
+    const mainRect = m.getBoundingClientRect();
+    const contentRect = c.getBoundingClientRect();
+    const contentLeftInMain =
+      contentRect.left - mainRect.left + m.scrollLeft;
+    const contentTopInMain =
+      contentRect.top - mainRect.top + m.scrollTop;
+    m.scrollTo({
+      left: Math.max(
+        0,
+        target.targetX + contentLeftInMain - m.clientWidth / 2,
+      ),
+      top: Math.max(
+        0,
+        target.targetY + contentTopInMain - m.clientHeight / 2,
+      ),
+      behavior: "auto",
+    });
+  }, [scale]);
+
   usePinchZoom(mainRef, {
     getCurrent: () => scaleRef.current,
     min: SCALE_MIN,
@@ -637,8 +673,18 @@ export default function Reader({ bookId }: { bookId: string }) {
       });
     },
     onCommit: (z) => {
+      if (!pinch) {
+        handleScaleChange(z);
+        return;
+      }
+      const startScale = scaleRef.current;
+      const ratio = z / startScale;
+      pendingPinchScrollRef.current = {
+        targetX: pinch.originX * ratio,
+        targetY: pinch.originY * ratio,
+      };
       setPinch(null);
-      handleScaleChange(z);
+      setScale(z);
     },
     snapStep: SCALE_STEP,
   });

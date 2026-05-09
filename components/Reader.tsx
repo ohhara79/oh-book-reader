@@ -68,7 +68,7 @@ const activeThreadKey = (id: string) => `ohbr.activeThread.${id}`;
 const DEFAULT_PAGE = 1;
 const DEFAULT_SCALE = 1.4;
 const SCALE_MIN = 0.5;
-const SCALE_MAX = 5;
+const SCALE_MAX = 3;
 const SCALE_STEP = 0.1;
 const PAGE_GAP_PX = 16;
 const RENDER_BUFFER = 2;

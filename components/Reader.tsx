@@ -68,6 +68,7 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_SCALE = 1.4;
 const SCALE_MIN = 0.5;
 const SCALE_MAX = 5;
+const SCALE_STEP = 0.1;
 const PAGE_GAP_PX = 16;
 const RENDER_BUFFER = 2;
 const DIMS_FETCH_CONCURRENCY = 16;
@@ -599,6 +600,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     min: SCALE_MIN,
     max: SCALE_MAX,
     onChange: handleScaleChange,
+    snapStep: SCALE_STEP,
   });
 
   useEffect(() => {
@@ -690,11 +692,11 @@ export default function Reader({ bookId }: { bookId: string }) {
         case "+":
         case "=":
           e.preventDefault();
-          stepZoom(0.1);
+          stepZoom(SCALE_STEP);
           return;
         case "-":
           e.preventDefault();
-          stepZoom(-0.1);
+          stepZoom(-SCALE_STEP);
           return;
         case "0":
           e.preventDefault();
@@ -1101,7 +1103,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               >
                 <button
                   type="button"
-                  onClick={() => stepScale(-0.1)}
+                  onClick={() => stepScale(-SCALE_STEP)}
                   disabled={scale <= SCALE_MIN}
                   title={`Zoom out (${Math.round(scale * 100)}%)`}
                   aria-label={`Zoom out, currently ${Math.round(scale * 100)}%`}
@@ -1125,7 +1127,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   type="range"
                   min={SCALE_MIN}
                   max={SCALE_MAX}
-                  step={0.1}
+                  step={SCALE_STEP}
                   value={scale}
                   onChange={(e) => {
                     const n = Number(e.target.value);
@@ -1144,7 +1146,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => stepScale(0.1)}
+                  onClick={() => stepScale(SCALE_STEP)}
                   disabled={scale >= SCALE_MAX}
                   title={`Zoom in (${Math.round(scale * 100)}%)`}
                   aria-label={`Zoom in, currently ${Math.round(scale * 100)}%`}

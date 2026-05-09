@@ -633,6 +633,29 @@ export default function Reader({ bookId }: { bookId: string }) {
     targetY: number;
   } | null>(null);
 
+  // Pages currently re-rasterizing after a pinch commit. PageSlot shows a
+  // spinner overlay while their entry is present; cleared per page when
+  // react-pdf fires onRenderSuccess.
+  const [pagesLoading, setPagesLoading] = useState<Set<number>>(
+    () => new Set(),
+  );
+
+  const clearPageLoading = useCallback((n: number) => {
+    setPagesLoading((prev) => {
+      if (!prev.has(n)) return prev;
+      const next = new Set(prev);
+      next.delete(n);
+      return next;
+    });
+  }, []);
+
+  // Safety net — drop spinners if onRenderSuccess never fires.
+  useEffect(() => {
+    if (pagesLoading.size === 0) return;
+    const t = setTimeout(() => setPagesLoading(new Set()), 4000);
+    return () => clearTimeout(t);
+  }, [pagesLoading]);
+
   useLayoutEffect(() => {
     const target = pendingPinchScrollRef.current;
     if (!target) return;
@@ -677,12 +700,20 @@ export default function Reader({ bookId }: { bookId: string }) {
         handleScaleChange(z);
         return;
       }
+      // Mark every currently-mounted visible page as loading so PageSlot
+      // shows a spinner during the brief re-rasterization window.
+      const loading = new Set<number>();
+      for (let n = renderWindow.start; n <= renderWindow.end; n++) {
+        const wrapper = pageWrapperRefs.current.get(n);
+        if (wrapper?.querySelector("canvas")) loading.add(n);
+      }
       const startScale = scaleRef.current;
       const ratio = z / startScale;
       pendingPinchScrollRef.current = {
         targetX: pinch.originX * ratio,
         targetY: pinch.originY * ratio,
       };
+      setPagesLoading(loading);
       setPinch(null);
       setScale(z);
     },
@@ -1338,6 +1369,8 @@ export default function Reader({ bookId }: { bookId: string }) {
                       height={dims.height}
                       mounted={mounted}
                       registerRef={registerPageRef}
+                      loading={pagesLoading.has(n)}
+                      onRendered={clearPageLoading}
                     />
                   );
                 })}

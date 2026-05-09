@@ -719,7 +719,27 @@ export default function Reader({ bookId }: { bookId: string }) {
       const startScale = scaleRef.current;
       const ratio = z / startScale;
       const targetX = anchor.originX * ratio;
-      const targetY = anchor.originY * ratio;
+
+      // Pages stack with a constant PAGE_GAP_PX between them; that gap
+      // does NOT scale with `scale`. Without holding it out of the
+      // ratio multiplication, the formula overshoots by (p-1)·gap·
+      // (ratio-1) — invisible on page 1, half a page on page 300.
+      let focalPage = 1;
+      let cumY = 0;
+      const total = numPages ?? 0;
+      for (let n = 1; n <= total; n++) {
+        const d = pageDims[n];
+        if (!d) break;
+        const pageBottom = cumY + d.height;
+        if (anchor.originY < pageBottom) {
+          focalPage = n;
+          break;
+        }
+        cumY = pageBottom + PAGE_GAP_PX;
+        focalPage = n + 1;
+      }
+      const B = (focalPage - 1) * PAGE_GAP_PX;
+      const targetY = (anchor.originY - B) * ratio + B;
 
       // Commit the scale change synchronously so we can read post-zoom
       // layout and scroll in the same call frame, before the browser

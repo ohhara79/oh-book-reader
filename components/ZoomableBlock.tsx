@@ -43,7 +43,8 @@ export default function ZoomableBlock({
   }, [open]);
 
   const close = () => setOpen(false);
-  const triggerCls = `cursor-zoom-in ${triggerClassName ?? ""}`;
+  const triggerCls = `cursor-zoom-in [&_*]:pointer-events-none ${triggerClassName ?? ""}`;
+  const lightboxContentCls = `[&_*]:pointer-events-none ${contentClassName ?? ""}`;
   const lightboxNode = html ? null : (content ?? trigger);
 
   return (
@@ -88,7 +89,7 @@ export default function ZoomableBlock({
             doubleClick={{ mode: "reset" }}
           >
             <TransformComponent
-              wrapperStyle={{ width: "100%", height: "100%" }}
+              wrapperStyle={{ width: "100%", height: "100%", touchAction: "none" }}
               contentStyle={{ width: "100%", height: "100%" }}
             >
               <div
@@ -98,13 +99,13 @@ export default function ZoomableBlock({
                 {html ? (
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className={contentClassName}
+                    className={lightboxContentCls}
                     dangerouslySetInnerHTML={{ __html: html }}
                   />
                 ) : (
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className={contentClassName}
+                    className={lightboxContentCls}
                   >
                     {lightboxNode}
                   </div>

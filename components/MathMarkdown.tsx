@@ -94,7 +94,7 @@ const COPY_BTN_BLOCK_CLS =
   "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 const COPY_BTN_INLINE_CLS =
-  "absolute top-0 left-full -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+  "absolute top-0 left-full -translate-y-1/2 -translate-x-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 function MathCopyWrapper({
   display,

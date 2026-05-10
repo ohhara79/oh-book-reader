@@ -135,6 +135,15 @@ const COPY_BTN_BLOCK_CLS =
 const COPY_BTN_INLINE_CLS =
   "absolute top-0 left-full -translate-y-1/2 -translate-x-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
+// Display math (`<span class="katex-display relative group block">`) is a
+// full-width block whose internal layout pushes the formula visibly below
+// the wrapper's top edge — `top-1` puts the icon mid-formula. Use the same
+// vertical anchor as the inline-math icon (center on the wrapper's top
+// edge), but right-align instead of `left-full` since the wrapper is full
+// width, not inline.
+const COPY_BTN_MATH_DISPLAY_CLS =
+  "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+
 // Prose blocks (p / blockquote / table / ul / ol) have no top padding, so a
 // plain `top-1 right-1` icon sits on top of the first line of text. Anchor
 // the icon's vertical center at the block's top edge instead — half above,
@@ -160,7 +169,7 @@ function MathCopyWrapper({
     return (
       <span ref={ref} className={`${className ?? ""} relative group block`}>
         {children}
-        <CopyButton text={getLatex} title="Copy LaTeX" className={COPY_BTN_BLOCK_CLS} />
+        <CopyButton text={getLatex} title="Copy LaTeX" className={COPY_BTN_MATH_DISPLAY_CLS} />
       </span>
     );
   }

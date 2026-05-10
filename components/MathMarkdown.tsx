@@ -91,10 +91,10 @@ function nodeToText(node: unknown): string {
 }
 
 const COPY_BTN_BLOCK_CLS =
-  "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded";
+  "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 const COPY_BTN_INLINE_CLS =
-  "absolute top-1/2 left-full -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded";
+  "absolute top-1/2 left-full -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 function MathCopyWrapper({
   display,

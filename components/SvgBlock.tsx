@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import CopyButton from "./CopyButton";
 
 const COPY_BTN_CLS =
-  "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded";
+  "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 type RenderState =
   | { kind: "loading" }

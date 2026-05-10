@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CopyButton from "./CopyButton";
+
+const COPY_BTN_CLS =
+  "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded";
 
 type RenderState =
   | { kind: "loading" }
@@ -34,25 +38,34 @@ export default function SvgBlock({ code }: { code: string }) {
 
   if (state.kind === "loading") {
     return (
-      <pre>
-        <code>{code}</code>
-      </pre>
+      <div className="relative group">
+        <pre>
+          <code>{code}</code>
+        </pre>
+        <CopyButton text={code} title="Copy SVG source" className={COPY_BTN_CLS} />
+      </div>
     );
   }
   if (state.kind === "err") {
     return (
       <details className="my-2 text-xs text-red-600 dark:text-red-400">
         <summary>SVG error: {state.msg}</summary>
-        <pre className="mt-1">
-          <code>{code}</code>
-        </pre>
+        <div className="relative group">
+          <pre className="mt-1">
+            <code>{code}</code>
+          </pre>
+          <CopyButton text={code} title="Copy SVG source" className={COPY_BTN_CLS} />
+        </div>
       </details>
     );
   }
   return (
-    <div
-      className="my-2 flex justify-center max-w-full overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto"
-      dangerouslySetInnerHTML={{ __html: state.html }}
-    />
+    <div className="relative group my-2">
+      <div
+        className="flex justify-center max-w-full overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto"
+        dangerouslySetInnerHTML={{ __html: state.html }}
+      />
+      <CopyButton text={code} title="Copy SVG source" className={COPY_BTN_CLS} />
+    </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  text: string;
+  text: string | (() => string | null | undefined);
   title?: string;
   className?: string;
 };
@@ -19,9 +19,10 @@ export default function CopyButton({ text, title = "Copy", className }: Props) {
   }, []);
 
   async function onClick() {
-    if (!text) return;
+    const value = typeof text === "function" ? (text() ?? "") : text;
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setCopied(false), 1500);
@@ -30,7 +31,7 @@ export default function CopyButton({ text, title = "Copy", className }: Props) {
     }
   }
 
-  const disabled = !text;
+  const disabled = typeof text === "string" && !text;
 
   return (
     <button

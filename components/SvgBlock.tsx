@@ -65,6 +65,7 @@ export default function SvgBlock({ code }: { code: string }) {
       <ZoomableBlock
         label="SVG diagram"
         triggerClassName="flex justify-center w-full max-w-full overflow-x-auto bg-transparent border-0 p-0 text-left [&_svg]:max-w-full [&_svg]:h-auto"
+        contentClassName="w-[90vw] h-[90vh] [&_svg]:w-full [&_svg]:h-full"
         html={state.html}
       />
       <CopyButton text={code} title="Copy SVG source" className={COPY_BTN_CLS} />

@@ -135,6 +135,13 @@ const COPY_BTN_BLOCK_CLS =
 const COPY_BTN_INLINE_CLS =
   "absolute top-0 left-full -translate-y-1/2 -translate-x-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
+// Prose blocks (p / blockquote / table / ul / ol) have no top padding, so a
+// `top-1 right-1` icon sits on top of the first line of text. Anchor the icon
+// above the wrapping div instead — bottom edge meets the block's top edge —
+// matching how the inline-math copy button now sits above its formula.
+const COPY_BTN_PROSE_BLOCK_CLS =
+  "absolute right-1 bottom-full opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+
 function MathCopyWrapper({
   display,
   className,
@@ -247,7 +254,7 @@ function MathMarkdown({
         return (
           <div className="relative group">
             <p {...rest}>{children}</p>
-            <CopyButton text={src} title="Copy paragraph" className={COPY_BTN_BLOCK_CLS} />
+            <CopyButton text={src} title="Copy paragraph" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );
       },
@@ -257,7 +264,7 @@ function MathMarkdown({
         return (
           <div className="relative group">
             <blockquote {...rest}>{children}</blockquote>
-            <CopyButton text={src} title="Copy quote" className={COPY_BTN_BLOCK_CLS} />
+            <CopyButton text={src} title="Copy quote" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );
       },
@@ -267,7 +274,7 @@ function MathMarkdown({
         return (
           <div className="relative group">
             <table {...rest}>{children}</table>
-            <CopyButton text={src} title="Copy table" className={COPY_BTN_BLOCK_CLS} />
+            <CopyButton text={src} title="Copy table" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );
       },
@@ -277,7 +284,7 @@ function MathMarkdown({
         return (
           <div className="relative group">
             <ul {...rest}>{children}</ul>
-            <CopyButton text={src} title="Copy list" className={COPY_BTN_BLOCK_CLS} />
+            <CopyButton text={src} title="Copy list" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );
       },
@@ -287,7 +294,7 @@ function MathMarkdown({
         return (
           <div className="relative group">
             <ol {...rest}>{children}</ol>
-            <CopyButton text={src} title="Copy list" className={COPY_BTN_BLOCK_CLS} />
+            <CopyButton text={src} title="Copy list" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );
       },

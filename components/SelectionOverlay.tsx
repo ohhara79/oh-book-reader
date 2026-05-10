@@ -579,12 +579,22 @@ export default function SelectionOverlay({
         Math.min(canvas.height - sy, Math.ceil(hPct * canvas.height)),
       );
 
+      // Downsample to PDF native scale so captures are zoom-invariant. The
+      // live canvas pixel count grows with `scale`; cropping it directly would
+      // make the same selection produce a 4× bigger PNG at 2× zoom. Cap the
+      // resample ratio at 1 so we never bilinear-upscale (which would only
+      // add blur) when the user has zoomed out below 1.0.
+      const captureRatio = scale > 1 ? 1 / scale : 1;
+      const dw = Math.max(1, Math.round(sw * captureRatio));
+      const dh = Math.max(1, Math.round(sh * captureRatio));
       const tmp = document.createElement("canvas");
-      tmp.width = sw;
-      tmp.height = sh;
+      tmp.width = dw;
+      tmp.height = dh;
       const ctx = tmp.getContext("2d");
       if (!ctx) continue;
-      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, dw, dh);
       const dataUrl = tmp.toDataURL("image/png");
       const imageBase64 = dataUrl.split(",", 2)[1] ?? "";
 

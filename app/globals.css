@@ -28,6 +28,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Geist Mono enables `liga`/`calt` by default, which renders `>=` as `≥`,
+   `!=` as `≠`, `->` as `→`, etc. We want code to read literally. */
+code, pre, kbd, samp, .font-mono {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
 /* The PDF text layer is selectable by default and sits above the canvas at
    z-index: 2, which steals our drag events. We don't need browser-level text
    selection on the page (the SelectionOverlay extracts text from the layer

@@ -141,7 +141,7 @@ const COPY_BTN_INLINE_CLS =
 // half over the first line's ascender area — matching the placement style
 // of the inline-math copy button.
 const COPY_BTN_PROSE_BLOCK_CLS =
-  "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+  "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover/prose:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 function MathCopyWrapper({
   display,
@@ -253,7 +253,7 @@ function MathMarkdown({
         const src = copyableSource(node, "p");
         if (!src) return <p {...rest}>{children}</p>;
         return (
-          <div className="relative group">
+          <div className="relative group/prose">
             <p {...rest}>{children}</p>
             <CopyButton text={src} title="Copy paragraph" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
@@ -263,7 +263,7 @@ function MathMarkdown({
         const src = copyableSource(node, "blockquote");
         if (!src) return <blockquote {...rest}>{children}</blockquote>;
         return (
-          <div className="relative group">
+          <div className="relative group/prose">
             <blockquote {...rest}>{children}</blockquote>
             <CopyButton text={src} title="Copy quote" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
@@ -273,7 +273,7 @@ function MathMarkdown({
         const src = copyableSource(node, "table");
         if (!src) return <table {...rest}>{children}</table>;
         return (
-          <div className="relative group">
+          <div className="relative group/prose">
             <table {...rest}>{children}</table>
             <CopyButton text={src} title="Copy table" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
@@ -283,7 +283,7 @@ function MathMarkdown({
         const src = copyableSource(node, "ul");
         if (!src) return <ul {...rest}>{children}</ul>;
         return (
-          <div className="relative group">
+          <div className="relative group/prose">
             <ul {...rest}>{children}</ul>
             <CopyButton text={src} title="Copy list" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
@@ -293,7 +293,7 @@ function MathMarkdown({
         const src = copyableSource(node, "ol");
         if (!src) return <ol {...rest}>{children}</ol>;
         return (
-          <div className="relative group">
+          <div className="relative group/prose">
             <ol {...rest}>{children}</ol>
             <CopyButton text={src} title="Copy list" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>

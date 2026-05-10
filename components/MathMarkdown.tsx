@@ -23,6 +23,7 @@ const rehypePlugins: PluggableList = [
   [rehypeHighlight, { plainText: ["mermaid", "svg"], ignoreMissing: true }],
   rehypeKatex,
   rehypeMarkMathBlocks,
+  rehypeMarkCopyableBlocks,
 ];
 
 // remark-math@6 only treats $$…$$ as display math when the fence spans
@@ -72,6 +73,44 @@ function rehypeMarkMathBlocks() {
           }
         }
         walk(child, insideDisplay);
+      }
+    }
+    walk(tree, false);
+  };
+}
+
+// Tags the OUTERMOST p / blockquote / table / ul / ol so the matching
+// component override can attach a copy-markdown affordance. Once we descend
+// into a tagged ancestor, descendants of the same five types are left
+// untagged — this avoids stacked, redundant copy buttons (e.g. a <p> inside
+// a <blockquote> would otherwise render its own button on top of the
+// blockquote's).
+const COPYABLE_BLOCK_TAGS = new Set(["p", "blockquote", "table", "ul", "ol"]);
+
+function rehypeMarkCopyableBlocks() {
+  return (tree: unknown) => {
+    type Node = { children?: unknown[] };
+    type Element = {
+      type: "element";
+      tagName: string;
+      properties?: Record<string, unknown>;
+      children?: unknown[];
+    };
+    function walk(node: unknown, inCopyable: boolean) {
+      const children = (node as Node)?.children;
+      if (!Array.isArray(children)) return;
+      for (const child of children) {
+        const el = child as Element;
+        if (
+          el?.type === "element" &&
+          COPYABLE_BLOCK_TAGS.has(el.tagName) &&
+          !inCopyable
+        ) {
+          el.properties = { ...(el.properties ?? {}), dataCopyable: el.tagName };
+          walk(el, true);
+          continue;
+        }
+        walk(child, inCopyable);
       }
     }
     walk(tree, false);
@@ -141,7 +180,21 @@ function MathMarkdown({
   const normalizedText = useMemo(() => promoteDisplayMath(text), [text]);
 
   const components = useMemo<Components>(
-    () => ({
+    () => {
+      type HastNode = {
+        properties?: Record<string, unknown>;
+        position?: { start?: { offset?: number }; end?: { offset?: number } };
+      };
+      function copyableSource(node: unknown, expectedTag: string): string {
+        const n = node as HastNode | undefined;
+        if (n?.properties?.dataCopyable !== expectedTag) return "";
+        const start = n?.position?.start?.offset;
+        const end = n?.position?.end?.offset;
+        if (typeof start !== "number" || typeof end !== "number") return "";
+        return normalizedText.slice(start, end);
+      }
+
+      return {
       pre({ children, ...rest }) {
         const child = Array.isArray(children) ? children[0] : children;
         const childEl = child as ReactElement<{
@@ -188,8 +241,59 @@ function MathMarkdown({
           </span>
         );
       },
-    }),
-    [streaming],
+      p({ node, children, ...rest }) {
+        const src = copyableSource(node, "p");
+        if (!src) return <p {...rest}>{children}</p>;
+        return (
+          <div className="relative group">
+            <p {...rest}>{children}</p>
+            <CopyButton text={src} title="Copy paragraph" className={COPY_BTN_BLOCK_CLS} />
+          </div>
+        );
+      },
+      blockquote({ node, children, ...rest }) {
+        const src = copyableSource(node, "blockquote");
+        if (!src) return <blockquote {...rest}>{children}</blockquote>;
+        return (
+          <div className="relative group">
+            <blockquote {...rest}>{children}</blockquote>
+            <CopyButton text={src} title="Copy quote" className={COPY_BTN_BLOCK_CLS} />
+          </div>
+        );
+      },
+      table({ node, children, ...rest }) {
+        const src = copyableSource(node, "table");
+        if (!src) return <table {...rest}>{children}</table>;
+        return (
+          <div className="relative group">
+            <table {...rest}>{children}</table>
+            <CopyButton text={src} title="Copy table" className={COPY_BTN_BLOCK_CLS} />
+          </div>
+        );
+      },
+      ul({ node, children, ...rest }) {
+        const src = copyableSource(node, "ul");
+        if (!src) return <ul {...rest}>{children}</ul>;
+        return (
+          <div className="relative group">
+            <ul {...rest}>{children}</ul>
+            <CopyButton text={src} title="Copy list" className={COPY_BTN_BLOCK_CLS} />
+          </div>
+        );
+      },
+      ol({ node, children, ...rest }) {
+        const src = copyableSource(node, "ol");
+        if (!src) return <ol {...rest}>{children}</ol>;
+        return (
+          <div className="relative group">
+            <ol {...rest}>{children}</ol>
+            <CopyButton text={src} title="Copy list" className={COPY_BTN_BLOCK_CLS} />
+          </div>
+        );
+      },
+      };
+    },
+    [streaming, normalizedText],
   );
 
   return (

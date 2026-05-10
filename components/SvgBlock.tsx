@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import CopyButton from "./CopyButton";
+import ZoomableBlock from "./ZoomableBlock";
 
 const COPY_BTN_CLS =
   "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
@@ -61,9 +62,10 @@ export default function SvgBlock({ code }: { code: string }) {
   }
   return (
     <div className="relative group my-2">
-      <div
-        className="flex justify-center max-w-full overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto"
-        dangerouslySetInnerHTML={{ __html: state.html }}
+      <ZoomableBlock
+        label="SVG diagram"
+        triggerClassName="flex justify-center w-full max-w-full overflow-x-auto bg-transparent border-0 p-0 text-left [&_svg]:max-w-full [&_svg]:h-auto"
+        html={state.html}
       />
       <CopyButton text={code} title="Copy SVG source" className={COPY_BTN_CLS} />
     </div>

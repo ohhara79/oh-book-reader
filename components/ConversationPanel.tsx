@@ -11,6 +11,7 @@ import {
 import type { CapturedSelection } from "./SelectionOverlay";
 import MathMarkdown from "./MathMarkdown";
 import CopyButton from "./CopyButton";
+import ZoomableBlock from "./ZoomableBlock";
 import { usePinchZoom } from "@/lib/usePinchZoom";
 import { formatTimestamp } from "@/lib/formatTimestamp";
 import type { Conversation, Turn, TurnUsage } from "@/lib/store";
@@ -2030,64 +2031,20 @@ function ZoomableImage({
   alt: string;
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey, true);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [open]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={`Open ${alt} at original size`}
-        className="cursor-zoom-in border-0 bg-transparent p-0"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+    <ZoomableBlock
+      label={alt}
+      triggerClassName="border-0 bg-transparent p-0"
+      contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+      trigger={
+        // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={alt} className={className} />
-      </button>
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-50 overflow-auto bg-black/80 backdrop-blur-sm print:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Image preview"
-        >
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label="Close preview"
-            className="fixed right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-lg leading-none text-zinc-900 shadow hover:bg-white"
-          >
-            ×
-          </button>
-          <div className="flex min-h-full min-w-full items-center justify-center p-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src}
-              alt={alt}
-              onClick={(e) => e.stopPropagation()}
-              className="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
-            />
-          </div>
-        </div>
-      )}
-    </>
+      }
+      content={
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} />
+      }
+    />
   );
 }
 

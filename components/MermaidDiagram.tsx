@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import CopyButton from "./CopyButton";
+import ZoomableBlock from "./ZoomableBlock";
 
 const COPY_BTN_CLS =
   "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
@@ -84,9 +85,10 @@ export default function MermaidDiagram({ code }: { code: string }) {
   }
   return (
     <div className="relative group my-2">
-      <div
-        className="flex justify-center"
-        dangerouslySetInnerHTML={{ __html: state.svg }}
+      <ZoomableBlock
+        label="Mermaid diagram"
+        triggerClassName="flex justify-center w-full bg-transparent border-0 p-0 text-left"
+        html={state.svg}
       />
       <CopyButton text={code} title="Copy mermaid source" className={COPY_BTN_CLS} />
     </div>

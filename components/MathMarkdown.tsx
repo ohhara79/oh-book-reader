@@ -11,6 +11,7 @@ import type { PluggableList } from "unified";
 import MermaidDiagram from "./MermaidDiagram";
 import SvgBlock from "./SvgBlock";
 import CopyButton from "./CopyButton";
+import ZoomableBlock from "./ZoomableBlock";
 
 const remarkPlugins: PluggableList = [remarkGfm, remarkMath];
 // `plainText` keeps mermaid/svg fences as a single text node so the `pre`
@@ -256,6 +257,25 @@ function MathMarkdown({
           <span className={className} {...rest}>
             {children}
           </span>
+        );
+      },
+      img({ node: _node, src, alt, ...rest }) {
+        if (typeof src !== "string" || !src) return null;
+        const label = alt && alt.length > 0 ? alt : "Image";
+        return (
+          <ZoomableBlock
+            label={label}
+            triggerClassName="inline-block max-w-full bg-transparent border-0 p-0"
+            contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+            trigger={
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={src} alt={alt ?? ""} {...rest} />
+            }
+            content={
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={src} alt={alt ?? ""} />
+            }
+          />
         );
       },
       p({ node, children, ...rest }) {

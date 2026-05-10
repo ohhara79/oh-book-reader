@@ -5,12 +5,19 @@ import type { ReactElement } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
+import type { PluggableList } from "unified";
 import MermaidDiagram from "./MermaidDiagram";
 import SvgBlock from "./SvgBlock";
 
-const remarkPlugins = [remarkGfm, remarkMath];
-const rehypePlugins = [rehypeKatex];
+const remarkPlugins: PluggableList = [remarkGfm, remarkMath];
+// `plainText` keeps mermaid/svg fences as a single text node so the `pre`
+// override below can still extract their source via `childEl.props.children`.
+const rehypePlugins: PluggableList = [
+  [rehypeHighlight, { plainText: ["mermaid", "svg"], ignoreMissing: true }],
+  rehypeKatex,
+];
 
 // remark-math@6 only treats $$…$$ as display math when the fence spans
 // multiple lines; single-line $$X$$ becomes inline math, where KaTeX rejects

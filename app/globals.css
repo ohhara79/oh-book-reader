@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "highlight.js/styles/github.css" (prefers-color-scheme: light);
+@import "highlight.js/styles/github-dark.css" (prefers-color-scheme: dark);
 @plugin "@tailwindcss/typography";
 
 :root {

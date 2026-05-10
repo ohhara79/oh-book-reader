@@ -5,7 +5,7 @@ import CopyButton from "./CopyButton";
 import ZoomableBlock from "./ZoomableBlock";
 
 const COPY_BTN_CLS =
-  "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+  "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 type RenderState =
   | { kind: "loading" }

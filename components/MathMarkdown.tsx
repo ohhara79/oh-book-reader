@@ -94,7 +94,7 @@ const COPY_BTN_BLOCK_CLS =
   "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded";
 
 const COPY_BTN_INLINE_CLS =
-  "absolute -top-6 right-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded shadow-sm";
+  "absolute top-0 right-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 bg-white/70 dark:bg-zinc-800/70 backdrop-blur-sm rounded";
 
 function MathCopyWrapper({
   display,
@@ -120,7 +120,12 @@ function MathCopyWrapper({
   return (
     <span ref={ref} className={`${className ?? ""} relative inline-block group`}>
       {children}
-      <CopyButton text={getLatex} title="Copy LaTeX" className={COPY_BTN_INLINE_CLS} />
+      <CopyButton
+        text={getLatex}
+        title="Copy LaTeX"
+        size="sm"
+        className={COPY_BTN_INLINE_CLS}
+      />
     </span>
   );
 }

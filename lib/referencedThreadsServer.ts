@@ -9,6 +9,10 @@ import {
 } from "./store";
 import { buildSelectionBlocks } from "./promptParts";
 import { conversationTurnsToBlocks } from "./conversationHistory";
+import {
+  optimizeAttachmentsForClaude,
+  optimizeImageForClaude,
+} from "./optimizeImageForClaude";
 
 function pageRangeLabel(pages: number[]): string {
   if (pages.length === 0) return "";
@@ -44,20 +48,32 @@ async function blocksForOneThread(
     pageLabel = pageRangeLabel(selection.spans.map((s) => s.page));
     selectionBlocks = buildSelectionBlocks(
       await Promise.all(
-        selection.spans.map(async (s, i) => ({
-          page: s.page,
-          imageBase64: (
-            await readSelectionImage(bookId, conv.selection_id, i)
-          ).toString("base64"),
-          imageMediaType: "image/png" as const,
-          selectionText: s.extracted_text,
-          surroundingText: s.surrounding_text,
-        })),
+        selection.spans.map(async (s, i) => {
+          const png = await readSelectionImage(bookId, conv.selection_id, i);
+          const opt = await optimizeImageForClaude(png.toString("base64"));
+          return {
+            page: s.page,
+            imageBase64: opt.base64,
+            imageMediaType: opt.mediaType,
+            selectionText: s.extracted_text,
+            surroundingText: s.surrounding_text,
+          };
+        }),
       ),
     );
   } catch {
     // selection missing — include conversation messages anyway
   }
+
+  const optimizedMessages = await Promise.all(
+    conv.messages.map(async (t) => {
+      if (t.role === "assistant" || !t.attachments) return t;
+      return {
+        ...t,
+        attachments: await optimizeAttachmentsForClaude(t.attachments),
+      };
+    }),
+  );
 
   const headerParts = [
     `--- Begin referenced thread "${conv.title || "Untitled"}"`,
@@ -68,7 +84,7 @@ async function blocksForOneThread(
 
   const out: ContentBlock[] = [{ type: "text", text: header }];
   out.push(...selectionBlocks);
-  out.push(...conversationTurnsToBlocks(conv.messages));
+  out.push(...conversationTurnsToBlocks(optimizedMessages));
   out.push({
     type: "text",
     text: `--- End referenced thread "${conv.title || "Untitled"}" ---`,

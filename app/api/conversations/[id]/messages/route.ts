@@ -24,6 +24,10 @@ import {
 import { validateReferencedThreadIds } from "@/lib/referencedThreads";
 import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
 import { buildConversationHistoryBlocks } from "@/lib/conversationHistory";
+import {
+  optimizeAttachmentsForClaude,
+  optimizeImageForClaude,
+} from "@/lib/optimizeImageForClaude";
 
 export const runtime = "nodejs";
 
@@ -68,15 +72,17 @@ async function loadSelectionAsPromptSpans(
 ): Promise<PromptSpan[]> {
   const selection = await getSelection(bookId, selectionId);
   return Promise.all(
-    selection.spans.map(async (s, i) => ({
-      page: s.page,
-      imageBase64: (
-        await readSelectionImage(bookId, selectionId, i)
-      ).toString("base64"),
-      imageMediaType: "image/png" as const,
-      selectionText: s.extracted_text,
-      surroundingText: s.surrounding_text,
-    })),
+    selection.spans.map(async (s, i) => {
+      const png = await readSelectionImage(bookId, selectionId, i);
+      const opt = await optimizeImageForClaude(png.toString("base64"));
+      return {
+        page: s.page,
+        imageBase64: opt.base64,
+        imageMediaType: opt.mediaType,
+        selectionText: s.extracted_text,
+        surroundingText: s.surrounding_text,
+      };
+    }),
   );
 }
 
@@ -116,9 +122,18 @@ export async function POST(
   });
 
   const memos = unsentMemos(conv.messages);
-  const memoBlocks = buildMemoBlocks(memos);
+  const optimizedAttachments = await optimizeAttachmentsForClaude(attachments);
+  const optimizedMemos = await Promise.all(
+    memos.map(async (m) => ({
+      ...m,
+      attachments: m.attachments
+        ? await optimizeAttachmentsForClaude(m.attachments)
+        : undefined,
+    })),
+  );
+  const memoBlocks = buildMemoBlocks(optimizedMemos);
   const questionBlock = buildQuestionBlock(body.question);
-  const attachmentBlocks = buildAttachmentBlocks(attachments);
+  const attachmentBlocks = buildAttachmentBlocks(optimizedAttachments);
 
   const aggregatedRefIds: string[] = [];
   const seenRefIds = new Set<string>([conversationId]);
@@ -260,10 +275,22 @@ export async function POST(
             bookId,
             conv.selection_id,
           );
+          const optimizedConv: Conversation = {
+            ...conv,
+            messages: await Promise.all(
+              conv.messages.map(async (t) => {
+                if (t.role === "assistant" || !t.attachments) return t;
+                return {
+                  ...t,
+                  attachments: await optimizeAttachmentsForClaude(t.attachments),
+                };
+              }),
+            ),
+          };
           const fallbackContent: ContentBlock[] = [
             ...referencedBlocks,
             ...buildSelectionBlocks(promptSpans),
-            ...buildConversationHistoryBlocks(conv),
+            ...buildConversationHistoryBlocks(optimizedConv),
             ...memoBlocks,
             questionBlock,
             ...attachmentBlocks,

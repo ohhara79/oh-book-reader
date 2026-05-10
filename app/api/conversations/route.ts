@@ -17,6 +17,10 @@ import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 import { buildFirstUserContent, validateAttachments } from "@/lib/promptParts";
 import { validateReferencedThreadIds } from "@/lib/referencedThreads";
 import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
+import {
+  optimizeAttachmentsForClaude,
+  optimizePromptSpansForClaude,
+} from "@/lib/optimizeImageForClaude";
 
 export const runtime = "nodejs";
 
@@ -127,10 +131,14 @@ export async function POST(req: NextRequest) {
   const referencedBlocks = await loadReferencedThreadBlocks(
     referencedThreadIds,
   );
+  const [optimizedSpans, optimizedAttachments] = await Promise.all([
+    optimizePromptSpansForClaude(body.spans),
+    optimizeAttachmentsForClaude(attachments),
+  ]);
   const firstUserContent = buildFirstUserContent(
-    body.spans,
+    optimizedSpans,
     askBody.question,
-    attachments,
+    optimizedAttachments,
     referencedBlocks,
   );
 

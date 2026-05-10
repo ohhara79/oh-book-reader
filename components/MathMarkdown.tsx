@@ -136,11 +136,12 @@ const COPY_BTN_INLINE_CLS =
   "absolute top-0 left-full -translate-y-1/2 -translate-x-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 // Prose blocks (p / blockquote / table / ul / ol) have no top padding, so a
-// `top-1 right-1` icon sits on top of the first line of text. Anchor the icon
-// above the wrapping div instead — bottom edge meets the block's top edge —
-// matching how the inline-math copy button now sits above its formula.
+// plain `top-1 right-1` icon sits on top of the first line of text. Anchor
+// the icon's vertical center at the block's top edge instead — half above,
+// half over the first line's ascender area — matching the placement style
+// of the inline-math copy button.
 const COPY_BTN_PROSE_BLOCK_CLS =
-  "absolute right-1 bottom-full opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+  "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
 function MathCopyWrapper({
   display,

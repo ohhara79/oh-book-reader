@@ -833,6 +833,7 @@ export default function ConversationPanel({
             }
             return next;
           }),
+        onAssistantDone: () => setStreaming(false),
         onError: (m) => {
           let attached = false;
           setMessages((prev) => {
@@ -1012,6 +1013,7 @@ export default function ConversationPanel({
             }
             return next;
           }),
+        onAssistantDone: () => setStreaming(false),
         onError: (m) => {
           let attached = false;
           setMessages((prev) => {
@@ -2329,6 +2331,7 @@ type SseHandlers = {
   onMeta?: (conversationId: string, selectionId?: string) => void;
   onDelta: (chunk: string) => void;
   onUsage?: (usage: TurnUsage) => void;
+  onAssistantDone?: () => void;
   onError?: (message: string) => void;
 };
 
@@ -2363,6 +2366,7 @@ async function consumeSseInto(resp: Response, handlers: SseHandlers) {
               selectionId?: string;
             }
           | { type: "usage"; usage: TurnUsage }
+          | { type: "assistant_done" }
           | { type: "done" }
           | { type: "error"; message: string };
         if (payload.type === "delta") handlers.onDelta(payload.text);
@@ -2370,6 +2374,8 @@ async function consumeSseInto(resp: Response, handlers: SseHandlers) {
           handlers.onMeta?.(payload.conversationId, payload.selectionId);
         else if (payload.type === "usage")
           handlers.onUsage?.(payload.usage);
+        else if (payload.type === "assistant_done")
+          handlers.onAssistantDone?.();
         else if (payload.type === "error")
           handlers.onError?.(payload.message);
         else if (payload.type === "done") return;

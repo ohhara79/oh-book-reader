@@ -5,6 +5,7 @@ export type SsePayload =
   | { type: "session"; sessionId: string }
   | { type: "meta"; conversationId: string; selectionId?: string }
   | { type: "usage"; usage: TurnUsage }
+  | { type: "assistant_done" }
   | { type: "done" }
   | { type: "error"; message: string };
 

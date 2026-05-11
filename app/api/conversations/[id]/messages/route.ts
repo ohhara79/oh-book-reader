@@ -346,6 +346,7 @@ export async function POST(
             m.saveConversation(bookId, fresh),
           );
         }
+        controller.enqueue(sseFrame({ type: "assistant_done" }));
         controller.enqueue(sseFrame({ type: "done" }));
         console.log("[ask] done", {
           conversationId,

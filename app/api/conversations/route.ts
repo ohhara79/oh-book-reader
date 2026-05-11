@@ -232,6 +232,7 @@ export async function POST(req: NextRequest) {
             sessionId;
           convDirty = true;
         }
+        controller.enqueue(sseFrame({ type: "assistant_done" }));
         if (!errorMessage && assistantText.trim().length > 0) {
           const summary = await summarizeForTitle(
             askBody.question,

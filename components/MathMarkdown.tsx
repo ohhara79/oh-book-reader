@@ -27,14 +27,18 @@ const rehypePlugins: PluggableList = [
   rehypeMarkCopyableBlocks,
 ];
 
-// remark-math@6 only treats $$…$$ as display math when the fence spans
-// multiple lines; single-line $$X$$ becomes inline math, where KaTeX rejects
-// display-only commands like \tag{…}. Promote single-line $$…$$ to the
-// multi-line form so the parser classifies them as display blocks.
+// remark-math@6 only recognizes $$…$$ as a display-math block when both fences
+// sit alone on their own lines: anything after the opening $$ is parsed as a
+// meta info-string (and dropped), and a closing $$ that shares its line with
+// content does not terminate the block — KaTeX then receives malformed LaTeX
+// and rehype-katex renders the raw source in red as a katex-error. Promote
+// every $$…$$ pair to the canonical multi-line form so single-line inline-
+// style fences AND tightly-packed multi-line fences both get classified as
+// display blocks with their bodies intact.
 function promoteDisplayMath(input: string): string {
   return input.replace(
-    /(^|[^\\])\$\$((?:(?!\$\$)[^\n])+)\$\$/g,
-    (_, pre, body) => `${pre}\n\n$$\n${body}\n$$\n\n`,
+    /(^|[^\\])\$\$((?:(?!\$\$)[\s\S])+?)\$\$/g,
+    (_, pre, body) => `${pre}\n\n$$\n${body.trim()}\n$$\n\n`,
   );
 }
 

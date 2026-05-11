@@ -289,6 +289,50 @@ export async function saveConversation(
   );
 }
 
+// Per-conversation in-memory FIFO mutex. All read-modify-write sequences
+// against a conversation file must go through `updateConversation` so they
+// serialize and can't clobber each other (see the Haiku-window race fixed
+// in docs/plans/2026-05-12-03-fix-haiku-window-race.md).
+const convLocks = new Map<string, Promise<unknown>>();
+
+async function withConversationLock<T>(
+  bookId: string,
+  conversationId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const key = `${bookId}:${conversationId}`;
+  const prev = convLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const next = new Promise<void>((r) => {
+    release = r;
+  });
+  convLocks.set(
+    key,
+    next.catch(() => {}),
+  );
+  try {
+    await prev;
+    return await fn();
+  } finally {
+    release();
+    if (convLocks.get(key) === next) convLocks.delete(key);
+  }
+}
+
+export async function updateConversation(
+  bookId: string,
+  conversationId: string,
+  patch: (conv: Conversation) => void | Promise<void>,
+): Promise<Conversation> {
+  return withConversationLock(bookId, conversationId, async () => {
+    const conv = await getConversation(bookId, conversationId);
+    await patch(conv);
+    conv.updated_at = Date.now();
+    await saveConversation(bookId, conv);
+    return conv;
+  });
+}
+
 export async function deleteConversation(
   bookId: string,
   conversationId: string,
@@ -349,11 +393,9 @@ export async function appendMessages(
   conversationId: string,
   turns: Turn[],
 ): Promise<Conversation> {
-  const conv = await getConversation(bookId, conversationId);
-  conv.messages.push(...turns);
-  conv.updated_at = Date.now();
-  await saveConversation(bookId, conv);
-  return conv;
+  return updateConversation(bookId, conversationId, (conv) => {
+    conv.messages.push(...turns);
+  });
 }
 
 export async function appendMemoTurn(
@@ -363,15 +405,12 @@ export async function appendMemoTurn(
   attachments?: Attachment[],
   referencedThreadIds?: string[],
 ): Promise<Conversation> {
-  const conv = await getConversation(bookId, conversationId);
-  const now = Date.now();
-  const memo: Turn = { role: "memo", text, created_at: now };
-  if (attachments && attachments.length > 0) memo.attachments = attachments;
-  if (referencedThreadIds && referencedThreadIds.length > 0) {
-    memo.referenced_thread_ids = referencedThreadIds;
-  }
-  conv.messages.push(memo);
-  conv.updated_at = now;
-  await saveConversation(bookId, conv);
-  return conv;
+  return updateConversation(bookId, conversationId, (conv) => {
+    const memo: Turn = { role: "memo", text, created_at: Date.now() };
+    if (attachments && attachments.length > 0) memo.attachments = attachments;
+    if (referencedThreadIds && referencedThreadIds.length > 0) {
+      memo.referenced_thread_ids = referencedThreadIds;
+    }
+    conv.messages.push(memo);
+  });
 }

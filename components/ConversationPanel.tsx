@@ -389,6 +389,18 @@ export default function ConversationPanel({
   const [resolvingRef, setResolvingRef] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  // Counter of in-flight Claude streams (between submit and assistant_done).
+  // Lets `streaming` stay true across overlapping asks during the Haiku-title
+  // window without one stream's finally clobbering another stream's flag.
+  const inFlightRef = useRef(0);
+  const beginStream = () => {
+    inFlightRef.current += 1;
+    setStreaming(true);
+  };
+  const endStream = () => {
+    inFlightRef.current = Math.max(0, inFlightRef.current - 1);
+    if (inFlightRef.current === 0) setStreaming(false);
+  };
   const [posting, setPosting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -771,7 +783,8 @@ export default function ConversationPanel({
     refIds: string[],
   ) {
     stickToBottomRef.current = true;
-    setStreaming(true);
+    beginStream();
+    let endedEarly = false;
     setError(null);
     const askedAt = Date.now();
     setMessages((prev) => [
@@ -833,7 +846,10 @@ export default function ConversationPanel({
             }
             return next;
           }),
-        onAssistantDone: () => setStreaming(false),
+        onAssistantDone: () => {
+          endedEarly = true;
+          endStream();
+        },
         onError: (m) => {
           let attached = false;
           setMessages((prev) => {
@@ -854,7 +870,7 @@ export default function ConversationPanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setStreaming(false);
+      if (!endedEarly) endStream();
     }
   }
 
@@ -963,7 +979,8 @@ export default function ConversationPanel({
   ) {
     if (!conversationId) return;
     stickToBottomRef.current = true;
-    setStreaming(true);
+    beginStream();
+    let endedEarly = false;
     setError(null);
     const askedAt = Date.now();
     setMessages((prev) => [
@@ -1013,7 +1030,10 @@ export default function ConversationPanel({
             }
             return next;
           }),
-        onAssistantDone: () => setStreaming(false),
+        onAssistantDone: () => {
+          endedEarly = true;
+          endStream();
+        },
         onError: (m) => {
           let attached = false;
           setMessages((prev) => {
@@ -1034,7 +1054,7 @@ export default function ConversationPanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setStreaming(false);
+      if (!endedEarly) endStream();
     }
   }
 

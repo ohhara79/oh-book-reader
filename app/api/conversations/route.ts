@@ -10,7 +10,7 @@ import {
   saveSelection,
   saveConversation,
   appendMessages,
-  getConversation,
+  updateConversation,
 } from "@/lib/store";
 import { askClaude, summarizeForTitle } from "@/lib/claude";
 import { SSE_HEADERS, sseFrame } from "@/lib/sse";
@@ -224,27 +224,21 @@ export async function POST(req: NextRequest) {
           userTurn,
           assistantTurn,
         ]);
-
-        let convDirty = false;
-        const conv = await getConversation(body.bookId, conversation.id);
-        if (sessionId) {
-          (conv as Conversation & { session_id?: string }).session_id =
-            sessionId;
-          convDirty = true;
-        }
         controller.enqueue(sseFrame({ type: "assistant_done" }));
+
+        let summary: string | null = null;
         if (!errorMessage && assistantText.trim().length > 0) {
-          const summary = await summarizeForTitle(
-            askBody.question,
-            assistantText,
-          );
-          if (summary) {
-            conv.title = summary;
-            convDirty = true;
-          }
+          summary = await summarizeForTitle(askBody.question, assistantText);
         }
-        if (convDirty) {
-          await saveConversation(body.bookId, conv);
+
+        if (summary || sessionId) {
+          await updateConversation(body.bookId, conversation.id, (conv) => {
+            if (sessionId) {
+              (conv as Conversation & { session_id?: string }).session_id =
+                sessionId;
+            }
+            if (summary) conv.title = summary;
+          });
         }
         controller.enqueue(sseFrame({ type: "done" }));
       } catch (err) {

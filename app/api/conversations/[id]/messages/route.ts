@@ -10,6 +10,7 @@ import {
   getConversation,
   getSelection,
   readSelectionImage,
+  updateConversation,
 } from "@/lib/store";
 import { askClaude } from "@/lib/claude";
 import { SSE_HEADERS, sseComment, sseFrame } from "@/lib/sse";
@@ -337,14 +338,10 @@ export async function POST(
         };
         await appendMessages(bookId, conv.id, [userTurn, assistantTurn]);
         if (sessionId && sessionId !== conv.session_id) {
-          const fresh = (await getConversation(
-            bookId,
-            conv.id,
-          )) as Conversation & { session_id?: string };
-          fresh.session_id = sessionId;
-          await import("@/lib/store").then((m) =>
-            m.saveConversation(bookId, fresh),
-          );
+          await updateConversation(bookId, conv.id, (fresh) => {
+            (fresh as Conversation & { session_id?: string }).session_id =
+              sessionId;
+          });
         }
         controller.enqueue(sseFrame({ type: "assistant_done" }));
         controller.enqueue(sseFrame({ type: "done" }));

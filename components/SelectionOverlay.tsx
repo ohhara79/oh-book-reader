@@ -16,12 +16,18 @@ export type CapturedSpan = {
   /** PDF user-space coordinates, page-relative, scale-independent. */
   bbox: [number, number, number, number];
   imageBase64: string;
-  imageMediaType: "image/png";
+  imageMediaType: "image/png" | "image/jpeg";
   selectionText: string;
   surroundingText: string;
 };
 
 export type CapturedSelection = { spans: CapturedSpan[] };
+
+// Must match lib/optimizeImageForClaude.ts so the image saved & shown
+// matches what Claude's vision pipeline expects. Browser JPEG encoder is
+// not mozjpeg, but dimensions and quality target are identical.
+const MAX_LONG_EDGE = 1568;
+const JPEG_QUALITY = 0.85;
 
 type SelSpan = { page: number; bbox: [number, number, number, number] };
 export type Sel = {
@@ -585,8 +591,14 @@ export default function SelectionOverlay({
       // resample ratio at 1 so we never bilinear-upscale (which would only
       // add blur) when the user has zoomed out below 1.0.
       const captureRatio = scale > 1 ? 1 / scale : 1;
-      const dw = Math.max(1, Math.round(sw * captureRatio));
-      const dh = Math.max(1, Math.round(sh * captureRatio));
+      // Also cap the long edge at MAX_LONG_EDGE so the JPEG matches what
+      // Claude's vision pipeline downsamples to. Fold both scale factors
+      // into one resample step.
+      const nativeLong = Math.max(sw, sh) * captureRatio;
+      const longCap = nativeLong > MAX_LONG_EDGE ? MAX_LONG_EDGE / nativeLong : 1;
+      const finalRatio = captureRatio * longCap;
+      const dw = Math.max(1, Math.round(sw * finalRatio));
+      const dh = Math.max(1, Math.round(sh * finalRatio));
       const tmp = document.createElement("canvas");
       tmp.width = dw;
       tmp.height = dh;
@@ -595,7 +607,7 @@ export default function SelectionOverlay({
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, dw, dh);
-      const dataUrl = tmp.toDataURL("image/png");
+      const dataUrl = tmp.toDataURL("image/jpeg", JPEG_QUALITY);
       const imageBase64 = dataUrl.split(",", 2)[1] ?? "";
 
       // Extract text from the page's text layer.
@@ -667,7 +679,7 @@ export default function SelectionOverlay({
         page: pageNum,
         bbox: pdfBbox,
         imageBase64,
-        imageMediaType: "image/png",
+        imageMediaType: "image/jpeg",
         selectionText: inside.join(" ").replace(/\s+/g, " ").trim(),
         surroundingText: allText.join(" ").replace(/\s+/g, " ").trim(),
       });

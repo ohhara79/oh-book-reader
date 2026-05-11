@@ -46,16 +46,21 @@ export async function GET(
     try {
       const selection = await getSelection(id, conv.selection_id);
       const spans = await Promise.all(
-        selection.spans.map(async (s, i) => ({
-          page: s.page,
-          bbox: s.bbox,
-          imageBase64: (
-            await readSelectionImage(id, conv.selection_id, i)
-          ).toString("base64"),
-          imageMediaType: "image/png" as const,
-          selectionText: s.extracted_text,
-          surroundingText: s.surrounding_text,
-        })),
+        selection.spans.map(async (s, i) => {
+          const bytes = await readSelectionImage(id, conv.selection_id, i);
+          const isJpeg =
+            bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
+          return {
+            page: s.page,
+            bbox: s.bbox,
+            imageBase64: bytes.toString("base64"),
+            imageMediaType: (isJpeg ? "image/jpeg" : "image/png") as
+              | "image/jpeg"
+              | "image/png",
+            selectionText: s.extracted_text,
+            surroundingText: s.surrounding_text,
+          };
+        }),
       );
       capture = { spans };
     } catch {

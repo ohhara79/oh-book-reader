@@ -17,10 +17,7 @@ import { SSE_HEADERS, sseFrame } from "@/lib/sse";
 import { buildFirstUserContent, validateAttachments } from "@/lib/promptParts";
 import { validateReferencedThreadIds } from "@/lib/referencedThreads";
 import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
-import {
-  optimizeAttachmentsForClaude,
-  optimizePromptSpansForClaude,
-} from "@/lib/optimizeImageForClaude";
+import { optimizeAttachmentsForClaude } from "@/lib/optimizeImageForClaude";
 
 export const runtime = "nodejs";
 
@@ -59,6 +56,15 @@ export async function POST(req: NextRequest) {
     body.spans.length === 0
   ) {
     return new Response("bad request", { status: 400 });
+  }
+
+  // Client now compresses captures to JPEG before upload. Reject PNG so any
+  // client/server skew during rollout surfaces as a 4xx instead of silently
+  // storing a misnamed file.
+  for (const s of body.spans) {
+    if (s.imageMediaType && s.imageMediaType !== "image/jpeg") {
+      return new Response("spans must be image/jpeg", { status: 400 });
+    }
   }
 
   const kind = body.kind ?? "ask";
@@ -131,12 +137,16 @@ export async function POST(req: NextRequest) {
   const referencedBlocks = await loadReferencedThreadBlocks(
     referencedThreadIds,
   );
-  const [optimizedSpans, optimizedAttachments] = await Promise.all([
-    optimizePromptSpansForClaude(body.spans),
-    optimizeAttachmentsForClaude(attachments),
-  ]);
+  const optimizedAttachments = await optimizeAttachmentsForClaude(attachments);
+  const promptSpans = body.spans.map((s) => ({
+    page: s.page,
+    imageBase64: s.imageBase64,
+    imageMediaType: "image/jpeg" as const,
+    selectionText: s.selectionText,
+    surroundingText: s.surroundingText,
+  }));
   const firstUserContent = buildFirstUserContent(
-    optimizedSpans,
+    promptSpans,
     askBody.question,
     optimizedAttachments,
     referencedBlocks,

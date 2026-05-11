@@ -216,13 +216,13 @@ export async function getSelection(
 
 export async function saveSelection(
   selection: Selection,
-  imagesPngBytes: Uint8Array[],
+  imagesJpegBytes: Uint8Array[],
 ): Promise<void> {
   await ensureDir(selectionsDir(selection.book_id));
   const base = path.join(selectionsDir(selection.book_id), selection.id);
   await Promise.all(
-    imagesPngBytes.map((bytes, i) =>
-      fs.writeFile(`${base}_${i}.png`, bytes),
+    imagesJpegBytes.map((bytes, i) =>
+      fs.writeFile(`${base}_${i}.jpg`, bytes),
     ),
   );
   await writeJsonAtomic(`${base}.json`, selection);
@@ -234,6 +234,11 @@ export async function readSelectionImage(
   spanIndex: number,
 ): Promise<Buffer> {
   const base = path.join(selectionsDir(bookId), selectionId);
+  try {
+    return await fs.readFile(`${base}_${spanIndex}.jpg`);
+  } catch {
+    // fall through to legacy formats
+  }
   try {
     return await fs.readFile(`${base}_${spanIndex}.png`);
   } catch (err) {
@@ -301,14 +306,19 @@ export async function deleteSelection(
   const dir = selectionsDir(bookId);
   const base = path.join(dir, selectionId);
   await fs.rm(`${base}.json`, { force: true });
-  // Legacy single PNG.
+  // Legacy single PNG / JPG.
   await fs.rm(`${base}.png`, { force: true });
-  // Per-span PNGs: {id}_0.png, {id}_1.png, ...
+  await fs.rm(`${base}.jpg`, { force: true });
+  // Per-span images: {id}_0.jpg / {id}_0.png, ...
   try {
     const files = await fs.readdir(dir);
     await Promise.all(
       files
-        .filter((f) => f.startsWith(`${selectionId}_`) && f.endsWith(".png"))
+        .filter(
+          (f) =>
+            f.startsWith(`${selectionId}_`) &&
+            (f.endsWith(".jpg") || f.endsWith(".png")),
+        )
         .map((f) => fs.rm(path.join(dir, f), { force: true })),
     );
   } catch {

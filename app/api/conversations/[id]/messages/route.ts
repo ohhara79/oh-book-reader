@@ -66,6 +66,10 @@ function unsentMemos(messages: Turn[]): UnsentMemo[] {
   return out;
 }
 
+function isJpegBuffer(buf: Buffer): boolean {
+  return buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8;
+}
+
 async function loadSelectionAsPromptSpans(
   bookId: string,
   selectionId: string,
@@ -73,12 +77,24 @@ async function loadSelectionAsPromptSpans(
   const selection = await getSelection(bookId, selectionId);
   return Promise.all(
     selection.spans.map(async (s, i) => {
-      const png = await readSelectionImage(bookId, selectionId, i);
-      const opt = await optimizeImageForClaude(png.toString("base64"));
+      const bytes = await readSelectionImage(bookId, selectionId, i);
+      let imageBase64: string;
+      let imageMediaType: "image/jpeg" | "image/png";
+      if (isJpegBuffer(bytes)) {
+        // Already client-compressed at capture time — send verbatim.
+        imageBase64 = bytes.toString("base64");
+        imageMediaType = "image/jpeg";
+      } else {
+        // Legacy PNG selection — optimize on read so Claude still receives
+        // a sized-down JPEG.
+        const opt = await optimizeImageForClaude(bytes.toString("base64"));
+        imageBase64 = opt.base64;
+        imageMediaType = opt.mediaType;
+      }
       return {
         page: s.page,
-        imageBase64: opt.base64,
-        imageMediaType: opt.mediaType,
+        imageBase64,
+        imageMediaType,
         selectionText: s.extracted_text,
         surroundingText: s.surrounding_text,
       };

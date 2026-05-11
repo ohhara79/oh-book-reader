@@ -1,6 +1,5 @@
 import sharp from "sharp";
 import { isImageMediaType, type Attachment } from "./attachments";
-import type { PromptSpan } from "./promptParts";
 
 // The Claude Agent SDK pipes each request as one NDJSON line to the bundled
 // claude CLI. The binary's line reader has an internal cap that truncates
@@ -30,21 +29,6 @@ export async function optimizeImageForClaude(
     .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
     .toBuffer();
   return { base64: out.toString("base64"), mediaType: "image/jpeg" };
-}
-
-export async function optimizePromptSpansForClaude(
-  spans: PromptSpan[],
-): Promise<PromptSpan[]> {
-  return Promise.all(
-    spans.map(async (s) => {
-      const opt = await optimizeImageForClaude(s.imageBase64);
-      return {
-        ...s,
-        imageBase64: opt.base64,
-        imageMediaType: opt.mediaType,
-      };
-    }),
-  );
 }
 
 export async function optimizeAttachmentsForClaude(

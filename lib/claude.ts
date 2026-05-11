@@ -228,7 +228,7 @@ export async function* askClaude({
 }
 
 const TITLE_MODEL = "claude-haiku-4-5";
-const TITLE_TIMEOUT_MS = 15_000;
+const TITLE_TIMEOUT_MS = 30_000;
 const TITLE_ANSWER_INPUT_LIMIT = 4000;
 const TITLE_MAX_CHARS = 80;
 

@@ -47,9 +47,19 @@ async function blocksForOneThread(
   try {
     const selection = await getSelection(bookId, conv.selection_id);
     pageLabel = pageRangeLabel(selection.spans.map((s) => s.page));
+    const textOnly = Boolean(selection.text_only);
     selectionBlocks = buildSelectionBlocks(
       await Promise.all(
         selection.spans.map(async (s, i) => {
+          if (textOnly) {
+            return {
+              page: s.page,
+              imageBase64: "",
+              imageMediaType: "image/png" as const,
+              selectionText: s.extracted_text,
+              surroundingText: s.surrounding_text,
+            };
+          }
           const bytes = await readSelectionImage(bookId, conv.selection_id, i);
           const mediaType = sniffImageMediaType(bytes);
           const r = await maybeResizeForClaude(
@@ -65,6 +75,7 @@ async function blocksForOneThread(
           };
         }),
       ),
+      { textOnly },
     );
   } catch {
     // selection missing — include conversation messages anyway

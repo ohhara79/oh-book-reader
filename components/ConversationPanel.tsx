@@ -70,6 +70,18 @@ function readComposerPreviewEnabled(): boolean {
   }
 }
 
+const COMPOSER_TEXT_ONLY_KEY = "ohbr.composerTextOnly";
+
+function readComposerTextOnly(): boolean {
+  try {
+    const raw = localStorage.getItem(COMPOSER_TEXT_ONLY_KEY);
+    if (raw === null) return false;
+    return raw === "true";
+  } catch {
+    return false;
+  }
+}
+
 const FONT_ZOOM_KEY = "ohbr.messageFontZoom";
 const LIST_FONT_ZOOM_KEY = "ohbr.threadListFontZoom";
 const MIN_ZOOM = 0.5;
@@ -418,6 +430,13 @@ export default function ConversationPanel({
       previewEnabled ? "true" : "false",
     );
   }, [previewEnabled]);
+  const [textOnly, setTextOnly] = useState<boolean>(() => readComposerTextOnly());
+  useEffect(() => {
+    localStorage.setItem(
+      COMPOSER_TEXT_ONLY_KEY,
+      textOnly ? "true" : "false",
+    );
+  }, [textOnly]);
   const [fontZoom, setFontZoom] = useState<number>(() => readMessageFontZoom());
   useEffect(() => {
     localStorage.setItem(FONT_ZOOM_KEY, String(fontZoom));
@@ -806,10 +825,11 @@ export default function ConversationPanel({
         body: JSON.stringify({
           bookId,
           kind: "ask",
+          textOnly: cap.textOnly ?? false,
           spans: cap.spans.map((s) => ({
             page: s.page,
             bbox: s.bbox,
-            imageBase64: s.imageBase64,
+            imageBase64: cap.textOnly ? "" : s.imageBase64,
             imageMediaType: s.imageMediaType,
             selectionText: s.selectionText,
             surroundingText: s.surroundingText,
@@ -901,10 +921,11 @@ export default function ConversationPanel({
         body: JSON.stringify({
           bookId,
           kind: "memo",
+          textOnly: cap.textOnly ?? false,
           spans: cap.spans.map((s) => ({
             page: s.page,
             bbox: s.bbox,
-            imageBase64: s.imageBase64,
+            imageBase64: cap.textOnly ? "" : s.imageBase64,
             imageMediaType: s.imageMediaType,
             selectionText: s.selectionText,
             surroundingText: s.surroundingText,
@@ -1157,7 +1178,8 @@ export default function ConversationPanel({
     setRefInputValue("");
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversationAsk(active.capture, q, atts, refIds);
+      const capWithFlag: CapturedSelection = { ...active.capture, textOnly };
+      void startNewConversationAsk(capWithFlag, q, atts, refIds);
     } else if (conversationId) {
       void sendFollowup(q, atts, refIds);
     }
@@ -1175,7 +1197,8 @@ export default function ConversationPanel({
     setRefInputValue("");
     if (active?.kind === "new" && !newConvSentRef.current) {
       newConvSentRef.current = true;
-      void startNewConversationMemo(active.capture, t, atts, refIds);
+      const capWithFlag: CapturedSelection = { ...active.capture, textOnly };
+      void startNewConversationMemo(capWithFlag, t, atts, refIds);
     } else if (conversationId) {
       void appendMemoToExisting(t, atts, refIds);
     }
@@ -1539,6 +1562,7 @@ export default function ConversationPanel({
               <PreviewBox
                 capture={active.capture}
                 fontSize={previewFontSize}
+                textOnly={textOnly}
               />
             )}
             {active?.kind === "existing" && existingCapture && (
@@ -1969,6 +1993,59 @@ export default function ConversationPanel({
                   </svg>
                 )}
               </button>
+              {active?.kind === "new" && (
+                <button
+                  type="button"
+                  onClick={() => setTextOnly((v) => !v)}
+                  title={
+                    textOnly
+                      ? "Include image with capture"
+                      : "Skip image (text only)"
+                  }
+                  aria-label={
+                    textOnly
+                      ? "Include image with capture"
+                      : "Skip image (text only)"
+                  }
+                  aria-pressed={textOnly}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 md:h-7 md:w-7 dark:hover:text-zinc-100"
+                >
+                  {textOnly ? (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="2" y="3" width="12" height="10" rx="1" />
+                      <circle cx="6" cy="7" r="1" />
+                      <path d="M3 11l3-3 4 4" />
+                      <path d="M2 2l12 12" />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="2" y="3" width="12" height="10" rx="1" />
+                      <circle cx="6" cy="7" r="1" />
+                      <path d="M3 11l3-3 4 4 2-2 1 1" />
+                    </svg>
+                  )}
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1997,17 +2074,20 @@ export default function ConversationPanel({
 function PreviewBox({
   capture,
   fontSize,
+  textOnly,
 }: {
   capture: CapturedSelection;
   fontSize: string;
+  textOnly?: boolean;
 }) {
+  const isTextOnly = textOnly ?? capture.textOnly ?? false;
   const first = capture.spans[0];
   const last = capture.spans[capture.spans.length - 1];
   const label =
     capture.spans.length === 1
       ? `page ${first.page}`
       : `pages ${first.page}–${last.page}`;
-  const copyMarkdown = selectionSection(capture);
+  const copyMarkdown = selectionSection({ ...capture, textOnly: isTextOnly });
   return (
     <div
       className="rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900"
@@ -2016,17 +2096,27 @@ function PreviewBox({
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[0.8333em] uppercase tracking-wide text-zinc-500">
           Selected region · {label}
+          {isTextOnly && " · text only"}
         </p>
-        <CopyButton text={copyMarkdown} title="Copy selection (image + text)" />
+        <CopyButton
+          text={copyMarkdown}
+          title={
+            isTextOnly
+              ? "Copy selection text"
+              : "Copy selection (image + text)"
+          }
+        />
       </div>
       <div className="space-y-2">
         {capture.spans.map((s, i) => (
           <div key={i}>
-            <ZoomableImage
-              src={`data:${s.imageMediaType};base64,${s.imageBase64}`}
-              alt={`selection page ${s.page}`}
-              className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
-            />
+            {!isTextOnly && (
+              <ZoomableImage
+                src={`data:${s.imageMediaType};base64,${s.imageBase64}`}
+                alt={`selection page ${s.page}`}
+                className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+              />
+            )}
             {capture.spans.length > 1 && (
               <p className="mt-1 text-[0.8333em] uppercase tracking-wide text-zinc-500">
                 page {s.page}

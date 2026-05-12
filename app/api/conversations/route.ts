@@ -38,6 +38,7 @@ type Body =
       question: string;
       attachments?: unknown;
       referencedThreadIds?: unknown;
+      textOnly?: boolean;
     }
   | {
       bookId: string;
@@ -46,6 +47,7 @@ type Body =
       text: string;
       attachments?: unknown;
       referencedThreadIds?: unknown;
+      textOnly?: boolean;
     };
 
 export async function POST(req: NextRequest) {
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
   }
   const referencedThreadIds = referencedIdsResult;
 
+  const textOnly = Boolean(body.textOnly);
   const now = Date.now();
   const spans: SelectionSpan[] = body.spans.map((s) => ({
     page: s.page,
@@ -92,10 +95,11 @@ export async function POST(req: NextRequest) {
     book_id: body.bookId,
     spans,
     created_at: now,
+    ...(textOnly ? { text_only: true } : {}),
   };
-  const imageBuffers = body.spans.map((s) =>
-    Buffer.from(s.imageBase64, "base64"),
-  );
+  const imageBuffers = textOnly
+    ? []
+    : body.spans.map((s) => Buffer.from(s.imageBase64, "base64"));
   await saveSelection(selection, imageBuffers);
 
   if (kind === "memo") {
@@ -131,7 +135,7 @@ export async function POST(req: NextRequest) {
   const optimizedAttachments = await maybeResizeAttachmentsForClaude(attachments);
   const promptSpans = body.spans.map((s) => ({
     page: s.page,
-    imageBase64: s.imageBase64,
+    imageBase64: textOnly ? "" : s.imageBase64,
     imageMediaType: "image/png" as const,
     selectionText: s.selectionText,
     surroundingText: s.surroundingText,
@@ -141,6 +145,7 @@ export async function POST(req: NextRequest) {
     askBody.question,
     optimizedAttachments,
     referencedBlocks,
+    { textOnly },
   );
 
   const conversation: Conversation = {

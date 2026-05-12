@@ -21,7 +21,15 @@ export type CapturedSpan = {
   surroundingText: string;
 };
 
-export type CapturedSelection = { spans: CapturedSpan[] };
+export type CapturedSelection = {
+  spans: CapturedSpan[];
+  /**
+   * When true, the captured image is suppressed end-to-end: no PNG is
+   * written to disk and the Claude prompt omits the image content block.
+   * Set by the composer toggle before the capture is sent.
+   */
+  textOnly?: boolean;
+};
 
 // 1568 px matches Anthropic's vision-pipeline downsample target so we
 // don't waste vision tokens or wire bytes encoding pixels Claude will

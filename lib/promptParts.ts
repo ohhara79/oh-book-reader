@@ -58,16 +58,22 @@ export function attachmentBlocks(
   });
 }
 
-export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
+export type SelectionBlockOptions = { textOnly?: boolean };
+
+export function buildSelectionBlocks(
+  spans: PromptSpan[],
+  opts: SelectionBlockOptions = {},
+): ContentBlock[] {
   if (spans.length === 0) return [];
+  const fallback = opts.textOnly
+    ? "(no text layer available)"
+    : "(no text layer; rely on the image)";
   if (spans.length === 1) {
     const s = spans[0];
-    return [
+    const blocks: ContentBlock[] = [
       {
         type: "text",
-        text: `Selected text from page ${s.page}:\n${
-          s.selectionText || "(no text layer; rely on the image)"
-        }`,
+        text: `Selected text from page ${s.page}:\n${s.selectionText || fallback}`,
       },
       {
         type: "text",
@@ -75,15 +81,18 @@ export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
           s.surroundingText || "(none)"
         }`,
       },
-      {
+    ];
+    if (!opts.textOnly) {
+      blocks.push({
         type: "image",
         source: {
           type: "base64",
           media_type: s.imageMediaType ?? "image/png",
           data: s.imageBase64,
         },
-      },
-    ];
+      });
+    }
+    return blocks;
   }
 
   const out: ContentBlock[] = [];
@@ -96,18 +105,18 @@ export function buildSelectionBlocks(spans: PromptSpan[]): ContentBlock[] {
   for (const s of spans) {
     out.push({
       type: "text",
-      text: `Page ${s.page} — selected text:\n${
-        s.selectionText || "(no text layer; rely on the image)"
-      }`,
+      text: `Page ${s.page} — selected text:\n${s.selectionText || fallback}`,
     });
-    out.push({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: s.imageMediaType ?? "image/png",
-        data: s.imageBase64,
-      },
-    });
+    if (!opts.textOnly) {
+      out.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: s.imageMediaType ?? "image/png",
+          data: s.imageBase64,
+        },
+      });
+    }
   }
   out.push({
     type: "text",
@@ -138,10 +147,11 @@ export function buildFirstUserContent(
   question: string,
   attachments?: Attachment[],
   referencedThreadBlocks?: ContentBlock[],
+  opts: SelectionBlockOptions = {},
 ): ContentBlock[] {
   return [
     ...(referencedThreadBlocks ?? []),
-    ...buildSelectionBlocks(spans),
+    ...buildSelectionBlocks(spans, opts),
     buildQuestionBlock(question),
     ...attachmentBlocks(attachments),
   ];

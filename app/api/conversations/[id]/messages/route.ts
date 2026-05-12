@@ -71,10 +71,20 @@ function unsentMemos(messages: Turn[]): UnsentMemo[] {
 async function loadSelectionAsPromptSpans(
   bookId: string,
   selectionId: string,
-): Promise<PromptSpan[]> {
+): Promise<{ spans: PromptSpan[]; textOnly: boolean }> {
   const selection = await getSelection(bookId, selectionId);
-  return Promise.all(
-    selection.spans.map(async (s, i) => {
+  const textOnly = Boolean(selection.text_only);
+  const spans = await Promise.all(
+    selection.spans.map(async (s, i): Promise<PromptSpan> => {
+      if (textOnly) {
+        return {
+          page: s.page,
+          imageBase64: "",
+          imageMediaType: "image/png",
+          selectionText: s.extracted_text,
+          surroundingText: s.surrounding_text,
+        };
+      }
       const bytes = await readSelectionImage(bookId, selectionId, i);
       const mediaType = sniffImageMediaType(bytes);
       const r = await maybeResizeForClaude(bytes.toString("base64"), mediaType);
@@ -87,6 +97,7 @@ async function loadSelectionAsPromptSpans(
       };
     }),
   );
+  return { spans, textOnly };
 }
 
 export async function POST(
@@ -156,13 +167,13 @@ export async function POST(
 
   let followupContent: ContentBlock[];
   if (!conv.session_id) {
-    const promptSpans = await loadSelectionAsPromptSpans(
+    const { spans: promptSpans, textOnly } = await loadSelectionAsPromptSpans(
       bookId,
       conv.selection_id,
     );
     followupContent = [
       ...referencedBlocks,
-      ...buildSelectionBlocks(promptSpans),
+      ...buildSelectionBlocks(promptSpans, { textOnly }),
       ...memoBlocks,
       questionBlock,
       ...attachmentBlocks,
@@ -274,10 +285,8 @@ export async function POST(
           // the persisted conversation JSON and retry without resume so the
           // SDK starts a fresh session.
           console.log("[ask] fallback: rebuilding context");
-          const promptSpans = await loadSelectionAsPromptSpans(
-            bookId,
-            conv.selection_id,
-          );
+          const { spans: promptSpans, textOnly } =
+            await loadSelectionAsPromptSpans(bookId, conv.selection_id);
           const optimizedConv: Conversation = {
             ...conv,
             messages: await Promise.all(
@@ -292,7 +301,7 @@ export async function POST(
           };
           const fallbackContent: ContentBlock[] = [
             ...referencedBlocks,
-            ...buildSelectionBlocks(promptSpans),
+            ...buildSelectionBlocks(promptSpans, { textOnly }),
             ...buildConversationHistoryBlocks(optimizedConv),
             ...memoBlocks,
             questionBlock,

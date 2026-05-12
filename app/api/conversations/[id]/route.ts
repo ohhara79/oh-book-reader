@@ -30,11 +30,23 @@ export async function GET(
       selectionText: string;
       surroundingText: string;
     }[];
+    textOnly?: boolean;
   } | null = null;
   try {
     const selection = await getSelection(bookId, conv.selection_id);
+    const textOnly = Boolean(selection.text_only);
     const spans = await Promise.all(
       selection.spans.map(async (s, i) => {
+        if (textOnly) {
+          return {
+            page: s.page,
+            bbox: s.bbox,
+            imageBase64: "",
+            imageMediaType: "image/png" as "image/jpeg" | "image/png",
+            selectionText: s.extracted_text,
+            surroundingText: s.surrounding_text,
+          };
+        }
         const bytes = await readSelectionImage(bookId, conv.selection_id, i);
         const isJpeg =
           bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8;
@@ -50,7 +62,7 @@ export async function GET(
         };
       }),
     );
-    capture = { spans };
+    capture = { spans, ...(textOnly ? { textOnly: true } : {}) };
   } catch {
     // selection missing or unreadable — omit capture, conversation still loads
   }

@@ -71,6 +71,7 @@ export type Selection = {
   book_id: string;
   spans: SelectionSpan[];
   created_at: number;
+  text_only?: boolean;
 };
 
 type LegacySelectionRaw = {
@@ -220,11 +221,13 @@ export async function saveSelection(
 ): Promise<void> {
   await ensureDir(selectionsDir(selection.book_id));
   const base = path.join(selectionsDir(selection.book_id), selection.id);
-  await Promise.all(
-    imagesPngBytes.map((bytes, i) =>
-      fs.writeFile(`${base}_${i}.png`, bytes),
-    ),
-  );
+  if (!selection.text_only && imagesPngBytes.length > 0) {
+    await Promise.all(
+      imagesPngBytes.map((bytes, i) =>
+        fs.writeFile(`${base}_${i}.png`, bytes),
+      ),
+    );
+  }
   await writeJsonAtomic(`${base}.json`, selection);
 }
 

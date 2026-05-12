@@ -34,10 +34,12 @@ export function selectionSection(capture: CapturedSelection | null): string {
   lines.push(`## Selected region — ${pageLabel(capture.spans)}`);
   lines.push("");
   for (const s of capture.spans) {
-    lines.push(
-      `![selection page ${s.page}](data:${s.imageMediaType};base64,${s.imageBase64})`,
-    );
-    lines.push("");
+    if (!capture.textOnly) {
+      lines.push(
+        `![selection page ${s.page}](data:${s.imageMediaType};base64,${s.imageBase64})`,
+      );
+      lines.push("");
+    }
     if (s.selectionText) {
       lines.push(`> ${s.selectionText.replace(/\n/g, "\n> ")}`);
       lines.push("");

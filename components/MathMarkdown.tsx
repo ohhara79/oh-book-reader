@@ -199,8 +199,10 @@ function MathCopyWrapper({
       ?.textContent ?? "";
   if (display) {
     return (
-      <span ref={ref} className={`${className ?? ""} relative group block`}>
-        {children}
+      <span ref={ref} className="relative group block">
+        <span className={`${className ?? ""} block overflow-x-auto max-w-full`}>
+          {children}
+        </span>
         <CopyButton text={getLatex} title="Copy LaTeX" className={COPY_BTN_MATH_DISPLAY_CLS} />
       </span>
     );

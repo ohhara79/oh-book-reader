@@ -216,13 +216,13 @@ export async function getSelection(
 
 export async function saveSelection(
   selection: Selection,
-  imagesJpegBytes: Uint8Array[],
+  imagesPngBytes: Uint8Array[],
 ): Promise<void> {
   await ensureDir(selectionsDir(selection.book_id));
   const base = path.join(selectionsDir(selection.book_id), selection.id);
   await Promise.all(
-    imagesJpegBytes.map((bytes, i) =>
-      fs.writeFile(`${base}_${i}.jpg`, bytes),
+    imagesPngBytes.map((bytes, i) =>
+      fs.writeFile(`${base}_${i}.png`, bytes),
     ),
   );
   await writeJsonAtomic(`${base}.json`, selection);
@@ -235,14 +235,17 @@ export async function readSelectionImage(
 ): Promise<Buffer> {
   const base = path.join(selectionsDir(bookId), selectionId);
   try {
-    return await fs.readFile(`${base}_${spanIndex}.jpg`);
+    return await fs.readFile(`${base}_${spanIndex}.png`);
   } catch {
     // fall through to legacy formats
   }
   try {
-    return await fs.readFile(`${base}_${spanIndex}.png`);
+    // Brief era when captures were saved as JPEG — see
+    // docs/plans/2026-05-11-04-save-capture-as-jpeg-client-side.md and
+    // the rollback in docs/plans/<this plan>.
+    return await fs.readFile(`${base}_${spanIndex}.jpg`);
   } catch (err) {
-    // Legacy single-image layout: only span 0 maps to `${id}.png`.
+    // Older single-image layout: only span 0 maps to `${id}.png`.
     if (spanIndex === 0) {
       return fs.readFile(`${base}.png`);
     }

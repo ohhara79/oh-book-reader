@@ -10,8 +10,9 @@ import {
 import { buildSelectionBlocks } from "./promptParts";
 import { conversationTurnsToBlocks } from "./conversationHistory";
 import {
-  optimizeAttachmentsForClaude,
-  optimizeImageForClaude,
+  maybeResizeAttachmentsForClaude,
+  maybeResizeForClaude,
+  sniffImageMediaType,
 } from "./optimizeImageForClaude";
 
 function pageRangeLabel(pages: number[]): string {
@@ -49,12 +50,16 @@ async function blocksForOneThread(
     selectionBlocks = buildSelectionBlocks(
       await Promise.all(
         selection.spans.map(async (s, i) => {
-          const png = await readSelectionImage(bookId, conv.selection_id, i);
-          const opt = await optimizeImageForClaude(png.toString("base64"));
+          const bytes = await readSelectionImage(bookId, conv.selection_id, i);
+          const mediaType = sniffImageMediaType(bytes);
+          const r = await maybeResizeForClaude(
+            bytes.toString("base64"),
+            mediaType,
+          );
           return {
             page: s.page,
-            imageBase64: opt.base64,
-            imageMediaType: opt.mediaType,
+            imageBase64: r.base64,
+            imageMediaType: r.mediaType,
             selectionText: s.extracted_text,
             surroundingText: s.surrounding_text,
           };
@@ -70,7 +75,7 @@ async function blocksForOneThread(
       if (t.role === "assistant" || !t.attachments) return t;
       return {
         ...t,
-        attachments: await optimizeAttachmentsForClaude(t.attachments),
+        attachments: await maybeResizeAttachmentsForClaude(t.attachments),
       };
     }),
   );

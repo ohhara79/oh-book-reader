@@ -26,8 +26,9 @@ import { validateReferencedThreadIds } from "@/lib/referencedThreads";
 import { loadReferencedThreadBlocks } from "@/lib/referencedThreadsServer";
 import { buildConversationHistoryBlocks } from "@/lib/conversationHistory";
 import {
-  optimizeAttachmentsForClaude,
-  optimizeImageForClaude,
+  maybeResizeAttachmentsForClaude,
+  maybeResizeForClaude,
+  sniffImageMediaType,
 } from "@/lib/optimizeImageForClaude";
 
 export const runtime = "nodejs";
@@ -67,10 +68,6 @@ function unsentMemos(messages: Turn[]): UnsentMemo[] {
   return out;
 }
 
-function isJpegBuffer(buf: Buffer): boolean {
-  return buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8;
-}
-
 async function loadSelectionAsPromptSpans(
   bookId: string,
   selectionId: string,
@@ -79,23 +76,12 @@ async function loadSelectionAsPromptSpans(
   return Promise.all(
     selection.spans.map(async (s, i) => {
       const bytes = await readSelectionImage(bookId, selectionId, i);
-      let imageBase64: string;
-      let imageMediaType: "image/jpeg" | "image/png";
-      if (isJpegBuffer(bytes)) {
-        // Already client-compressed at capture time — send verbatim.
-        imageBase64 = bytes.toString("base64");
-        imageMediaType = "image/jpeg";
-      } else {
-        // Legacy PNG selection — optimize on read so Claude still receives
-        // a sized-down JPEG.
-        const opt = await optimizeImageForClaude(bytes.toString("base64"));
-        imageBase64 = opt.base64;
-        imageMediaType = opt.mediaType;
-      }
+      const mediaType = sniffImageMediaType(bytes);
+      const r = await maybeResizeForClaude(bytes.toString("base64"), mediaType);
       return {
         page: s.page,
-        imageBase64,
-        imageMediaType,
+        imageBase64: r.base64,
+        imageMediaType: r.mediaType,
         selectionText: s.extracted_text,
         surroundingText: s.surrounding_text,
       };
@@ -139,12 +125,12 @@ export async function POST(
   });
 
   const memos = unsentMemos(conv.messages);
-  const optimizedAttachments = await optimizeAttachmentsForClaude(attachments);
+  const optimizedAttachments = await maybeResizeAttachmentsForClaude(attachments);
   const optimizedMemos = await Promise.all(
     memos.map(async (m) => ({
       ...m,
       attachments: m.attachments
-        ? await optimizeAttachmentsForClaude(m.attachments)
+        ? await maybeResizeAttachmentsForClaude(m.attachments)
         : undefined,
     })),
   );
@@ -299,7 +285,7 @@ export async function POST(
                 if (t.role === "assistant" || !t.attachments) return t;
                 return {
                   ...t,
-                  attachments: await optimizeAttachmentsForClaude(t.attachments),
+                  attachments: await maybeResizeAttachmentsForClaude(t.attachments),
                 };
               }),
             ),

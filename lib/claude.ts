@@ -21,7 +21,10 @@ flowcharts/sequence/state/ER diagrams, or \`\`\`svg for free-form figures
 (geometry, math figures, custom drawings). In mermaid sequence diagrams,
 don't use mermaid keywords as participant aliases (e.g. opt, alt, end,
 loop, par, rect, note, over, as) — they're matched case-insensitively,
-so \`Opt\` parses as \`opt\`. For SVG, use currentColor for
+so \`Opt\` parses as \`opt\`. For matrices and grid-shaped math, use
+LaTeX (e.g. \`\\begin{pmatrix}…\\end{pmatrix}\`) inside $$…$$; don't
+use mermaid \`block-beta\`, which is broken in this renderer.
+For SVG, use currentColor for
 strokes and text so the diagram adapts to light/dark mode, set a viewBox, and
 omit fixed pixel dimensions when possible. Don't add diagrams when prose
 suffices. The user may not be a native speaker. If a question sounds

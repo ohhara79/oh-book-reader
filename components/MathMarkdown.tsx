@@ -289,7 +289,12 @@ function MathMarkdown({
             contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
             trigger={
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={src} alt={alt ?? ""} {...rest} />
+              <img
+                src={src}
+                alt={alt ?? ""}
+                {...rest}
+                className="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+              />
             }
             content={
               // eslint-disable-next-line @next/next/no-img-element

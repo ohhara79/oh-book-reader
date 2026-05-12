@@ -38,7 +38,18 @@ const remarkPlugins: PluggableList = [remarkGfm, remarkMath];
 // copy button reads LaTeX from the MathML `<annotation>` element it emits.
 const rehypePlugins: PluggableList = [
   [rehypeHighlight, { plainText: ["mermaid", "svg"], ignoreMissing: true }],
-  rehypeKatex,
+  [
+    rehypeKatex,
+    {
+      macros: {
+        // KaTeX 0.16 doesn't implement \sideset (amsmath). Approximation:
+        // pre-ornament on the left, operator with \nolimits + post-ornament
+        // on the right, outer \limits picks up trailing _{...}^{...} as
+        // natural below/above limits on the wrapping \mathop.
+        "\\sideset": "\\mathop{{}#1\\!#3\\nolimits#2}\\limits",
+      },
+    },
+  ],
   rehypeMarkMathBlocks,
   rehypeMarkCopyableBlocks,
 ];

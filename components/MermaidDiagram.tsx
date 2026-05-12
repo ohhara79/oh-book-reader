@@ -18,13 +18,42 @@ function readPrefersDark(): boolean {
 }
 
 // Wrap unquoted node labels in double quotes when their content contains
-// characters mermaid would misparse (e.g. `(` inside `[...]`). Mermaid's parser
-// treats quoted labels as opaque strings, so this is the official escape hatch.
-// Skips compound shapes ([[, [(, [/, [\, ((, {{) and already-quoted labels.
+// characters mermaid would misparse (e.g. `{` inside `[[...]]`). Mermaid's
+// parser treats quoted labels as opaque strings, so this is the official
+// escape hatch. Handles simple ([], {}, ()) and compound ([[]], [()], ([]),
+// (()), ((())), {{}}) shapes. Skips parallelograms/trapezoids and the
+// asymmetric `>` shape, which are uncommon in model output.
 function quoteRiskyMermaidLabels(src: string): string {
   const TRIGGER = /[(){}[\]]/;
   const esc = (s: string) => s.replace(/"/g, "#quot;");
   return src
+    // Compound shapes — longer openers first so circle's `((` doesn't poach
+    // from double-circle's `(((`.
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\(\(\((?!")([^\n]*?)\)\)\)/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}((("${esc(b)}")))` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\(\((?!["(])([^\n]*?)\)\)(?!\))/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}(("${esc(b)}"))` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[\[(?!")([^\n]*?)\]\]/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}[["${esc(b)}"]]` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[\((?!")([^\n]*?)\)\]/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}[("${esc(b)}")]` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\(\[(?!")([^\n]*?)\]\)/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}(["${esc(b)}"])` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\{\{(?!")([^\n]*?)\}\}/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}{{"${esc(b)}"}}` : m),
+    )
+    // Simple shapes.
     .replace(
       /(^|[\s\->|&;])([A-Za-z0-9_]+)\[(?!["[(/\\])([^\n]*?)\](?!\])/g,
       (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}["${esc(b)}"]` : m),

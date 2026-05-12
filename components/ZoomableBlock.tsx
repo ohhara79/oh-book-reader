@@ -15,6 +15,8 @@ type Props = {
   html?: string;
   /** When set, the lightbox shows a download button that saves this URL/data URI. */
   downloadSrc?: string;
+  /** Prepended to the filename: `${downloadPrefix}_${slug(label)}.${ext}`. */
+  downloadPrefix?: string;
 };
 
 const EXT_FROM_MIME: Record<string, string> = {
@@ -71,6 +73,7 @@ export default function ZoomableBlock({
   content,
   html,
   downloadSrc,
+  downloadPrefix,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -136,7 +139,12 @@ export default function ZoomableBlock({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                triggerDownload(downloadSrc, `${slugify(label)}.${extFromSrc(downloadSrc)}`);
+                const labelSlug = slugify(label);
+                const ext = extFromSrc(downloadSrc);
+                const filename = downloadPrefix
+                  ? `${downloadPrefix}_${labelSlug}.${ext}`
+                  : `${labelSlug}.${ext}`;
+                triggerDownload(downloadSrc, filename);
               }}
               aria-label={`Download ${label}`}
               title={`Download ${label}`}

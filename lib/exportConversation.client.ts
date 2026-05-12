@@ -27,14 +27,26 @@ export function downloadConversationMarkdown(md: string, filename: string): void
   );
 }
 
-export function conversationFilename(args: {
-  title: string;
-  conversationId: string;
-}): string {
-  const slug = args.title
+export function slugSegment(s: string, fallback: string): string {
+  const slug = s
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  const base = slug ? `${slug}_${args.conversationId}` : `thread_${args.conversationId}`;
-  return `${base}.md`;
+  return slug || fallback;
+}
+
+export function conversationFilenameBase(args: {
+  bookTitle: string;
+  threadTitle: string;
+  conversationId: string;
+}): string {
+  return `${slugSegment(args.bookTitle, "book")}_${slugSegment(args.threadTitle, "thread")}_${args.conversationId}`;
+}
+
+export function conversationFilename(args: {
+  bookTitle: string;
+  threadTitle: string;
+  conversationId: string;
+}): string {
+  return `${conversationFilenameBase(args)}.md`;
 }

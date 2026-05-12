@@ -210,10 +210,12 @@ function MathMarkdown({
   text,
   streaming = false,
   fontSize,
+  downloadPrefix,
 }: {
   text: string;
   streaming?: boolean;
   fontSize?: string;
+  downloadPrefix?: string;
 }) {
   const normalizedText = useMemo(() => promoteDisplayMath(text), [text]);
 
@@ -288,6 +290,7 @@ function MathMarkdown({
             triggerClassName="inline-block max-w-full bg-transparent border-0 p-0"
             contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
             downloadSrc={src}
+            downloadPrefix={downloadPrefix}
             trigger={
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -356,7 +359,7 @@ function MathMarkdown({
       },
       };
     },
-    [streaming, normalizedText],
+    [streaming, normalizedText, downloadPrefix],
   );
 
   return (
@@ -381,5 +384,6 @@ export default memo(
   (a, b) =>
     a.text === b.text &&
     a.streaming === b.streaming &&
-    a.fontSize === b.fontSize,
+    a.fontSize === b.fontSize &&
+    a.downloadPrefix === b.downloadPrefix,
 );

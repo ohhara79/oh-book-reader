@@ -1492,6 +1492,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                 : "empty"
             }
             bookId={bookId}
+            bookTitle={book?.title}
             pageNum={pageNum}
             active={active}
             selections={selections}

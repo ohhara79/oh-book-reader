@@ -38,6 +38,7 @@ import {
 } from "@/lib/exportConversation";
 import {
   conversationFilename,
+  conversationFilenameBase,
   downloadConversationMarkdown,
 } from "@/lib/exportConversation.client";
 import ThreadList, {
@@ -330,6 +331,7 @@ type ActiveConversation =
 
 type Props = {
   bookId: string;
+  bookTitle?: string;
   pageNum: number;
   active: ActiveConversation | null;
   selections: ThreadListSelection[];
@@ -370,6 +372,7 @@ type DisplayMessage =
 
 export default function ConversationPanel({
   bookId,
+  bookTitle,
   pageNum,
   active,
   selections,
@@ -774,11 +777,20 @@ export default function ConversationPanel({
   function onDownloadThread() {
     if (!exportMarkdown || !rawConversation) return;
     const filename = conversationFilename({
-      title: rawConversation.title ?? "",
+      bookTitle: bookTitle ?? "",
+      threadTitle: rawConversation.title ?? "",
       conversationId: rawConversation.id,
     });
     downloadConversationMarkdown(exportMarkdown, filename);
   }
+
+  const downloadPrefix = rawConversation
+    ? conversationFilenameBase({
+        bookTitle: bookTitle ?? "",
+        threadTitle: rawConversation.title ?? "",
+        conversationId: rawConversation.id,
+      })
+    : undefined;
 
   async function onShareThread() {
     if (!conversationId) return;
@@ -1569,6 +1581,7 @@ export default function ConversationPanel({
               <PreviewBox
                 capture={existingCapture}
                 fontSize={previewFontSize}
+                downloadPrefix={downloadPrefix}
               />
             )}
             {messages.map((m, i) => (
@@ -1582,6 +1595,7 @@ export default function ConversationPanel({
                 }
                 onOpenConversation={onOpenConversation}
                 fontSize={threadFontSize}
+                downloadPrefix={downloadPrefix}
               />
             ))}
           </div>
@@ -2075,10 +2089,12 @@ function PreviewBox({
   capture,
   fontSize,
   textOnly,
+  downloadPrefix,
 }: {
   capture: CapturedSelection;
   fontSize: string;
   textOnly?: boolean;
+  downloadPrefix?: string;
 }) {
   const isTextOnly = textOnly ?? capture.textOnly ?? false;
   const first = capture.spans[0];
@@ -2115,6 +2131,7 @@ function PreviewBox({
                 src={`data:${s.imageMediaType};base64,${s.imageBase64}`}
                 alt={`selection page ${s.page}`}
                 className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+                downloadPrefix={downloadPrefix}
               />
             )}
             {capture.spans.length > 1 && (
@@ -2138,10 +2155,12 @@ function ZoomableImage({
   src,
   alt,
   className,
+  downloadPrefix,
 }: {
   src: string;
   alt: string;
   className?: string;
+  downloadPrefix?: string;
 }) {
   return (
     <ZoomableBlock
@@ -2149,6 +2168,7 @@ function ZoomableImage({
       triggerClassName="border-0 bg-transparent p-0"
       contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
       downloadSrc={src}
+      downloadPrefix={downloadPrefix}
       trigger={
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={alt} className={className} />
@@ -2161,7 +2181,13 @@ function ZoomableImage({
   );
 }
 
-function AttachmentStrip({ attachments }: { attachments: Attachment[] }) {
+function AttachmentStrip({
+  attachments,
+  downloadPrefix,
+}: {
+  attachments: Attachment[];
+  downloadPrefix?: string;
+}) {
   if (attachments.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap gap-2">
@@ -2172,6 +2198,7 @@ function AttachmentStrip({ attachments }: { attachments: Attachment[] }) {
             src={`data:${a.media_type};base64,${a.data}`}
             alt={`attachment ${i + 1}`}
             className="max-h-32 rounded border border-zinc-200 dark:border-zinc-700 dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+            downloadPrefix={downloadPrefix}
           />
         ) : (
           <TextAttachmentChip
@@ -2320,11 +2347,13 @@ function MessageBubble({
   streaming,
   onOpenConversation,
   fontSize,
+  downloadPrefix,
 }: {
   m: DisplayMessage;
   streaming: boolean;
   onOpenConversation?: (conversationId: string) => void;
   fontSize: string;
+  downloadPrefix?: string;
 }) {
   if (m.role === "memo") {
     return (
@@ -2338,9 +2367,9 @@ function MessageBubble({
           </p>
           <CopyButton text={m.text} />
         </div>
-        <MathMarkdown text={m.text} fontSize={fontSize} />
+        <MathMarkdown text={m.text} fontSize={fontSize} downloadPrefix={downloadPrefix} />
         {m.attachments && (
-          <AttachmentStrip attachments={m.attachments} />
+          <AttachmentStrip attachments={m.attachments} downloadPrefix={downloadPrefix} />
         )}
         {m.referencedThreadIds && m.referencedThreadIds.length > 0 && (
           <ReferencedThreadsLine
@@ -2373,8 +2402,10 @@ function MessageBubble({
       </div>
       {isUser ? (
         <>
-          <MathMarkdown text={m.text} fontSize={fontSize} />
-          {m.attachments && <AttachmentStrip attachments={m.attachments} />}
+          <MathMarkdown text={m.text} fontSize={fontSize} downloadPrefix={downloadPrefix} />
+          {m.attachments && (
+            <AttachmentStrip attachments={m.attachments} downloadPrefix={downloadPrefix} />
+          )}
           {m.referencedThreadIds && m.referencedThreadIds.length > 0 && (
             <ReferencedThreadsLine
               ids={m.referencedThreadIds}
@@ -2388,6 +2419,7 @@ function MessageBubble({
             text={m.text || (streaming && !m.error ? "…" : "")}
             streaming={streaming}
             fontSize={fontSize}
+            downloadPrefix={downloadPrefix}
           />
           {streaming && m.text && (
             <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-zinc-400 print:hidden" />

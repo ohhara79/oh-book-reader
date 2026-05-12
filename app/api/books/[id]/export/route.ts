@@ -80,7 +80,8 @@ export async function GET(
 
     const md = conversationToMarkdown({ conversation: conv, capture });
     const base = conversationFilename({
-      title: conv.title ?? "",
+      bookTitle: book.title,
+      threadTitle: conv.title ?? "",
       conversationId: conv.id,
     });
     let name = base;

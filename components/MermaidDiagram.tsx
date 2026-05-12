@@ -17,6 +17,28 @@ function readPrefersDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+// Wrap unquoted node labels in double quotes when their content contains
+// characters mermaid would misparse (e.g. `(` inside `[...]`). Mermaid's parser
+// treats quoted labels as opaque strings, so this is the official escape hatch.
+// Skips compound shapes ([[, [(, [/, [\, ((, {{) and already-quoted labels.
+function quoteRiskyMermaidLabels(src: string): string {
+  const TRIGGER = /[(){}[\]]/;
+  const esc = (s: string) => s.replace(/"/g, "#quot;");
+  return src
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[(?!["[(/\\])([^\]\n]*?)\](?!\])/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}["${esc(b)}"]` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\{(?!["{])([^{}\n]*?)\}(?!\})/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}{"${esc(b)}"}` : m),
+    )
+    .replace(
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\((?!["(])([^()\n]*?)\)(?!\))/g,
+      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}("${esc(b)}")` : m),
+    );
+}
+
 export default function MermaidDiagram({ code }: { code: string }) {
   const rawId = useId();
   const id = "mmd-" + rawId.replace(/[^a-zA-Z0-9_-]/g, "");
@@ -46,7 +68,7 @@ export default function MermaidDiagram({ code }: { code: string }) {
           securityLevel: "strict",
           fontFamily: "inherit",
         });
-        const { svg } = await m.render(id, code);
+        const { svg } = await m.render(id, quoteRiskyMermaidLabels(code));
         if (!cancelled) setState({ kind: "ok", svg });
       } catch (e) {
         if (!cancelled) {

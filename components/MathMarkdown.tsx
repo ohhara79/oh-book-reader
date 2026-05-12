@@ -2,7 +2,11 @@
 
 import { memo, useMemo, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type Components,
+  type UrlTransform,
+} from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
@@ -12,6 +16,18 @@ import MermaidDiagram from "./MermaidDiagram";
 import SvgBlock from "./SvgBlock";
 import CopyButton from "./CopyButton";
 import ZoomableBlock from "./ZoomableBlock";
+
+// react-markdown's defaultUrlTransform strips every URL whose protocol isn't
+// http/https/ircs?/mailto/xmpp, so embedded `data:image/...;base64,...` URIs
+// (produced by selectionSection in lib/exportConversation.ts) would render as
+// empty <img src=""> and disappear. Allow base64-encoded image data URIs only
+// — link hrefs and other data: URIs still go through the default filter, so
+// `data:text/html,<script>...` remains blocked.
+const DATA_IMAGE_URL = /^data:image\/[\w.+-]+;base64,/i;
+const allowDataImageUrl: UrlTransform = (value) => {
+  if (DATA_IMAGE_URL.test(value)) return value;
+  return defaultUrlTransform(value);
+};
 
 const remarkPlugins: PluggableList = [remarkGfm, remarkMath];
 // `plainText` keeps mermaid/svg fences as a single text node so the `pre`
@@ -345,6 +361,7 @@ function MathMarkdown({
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
+        urlTransform={allowDataImageUrl}
         components={components}
       >
         {normalizedText}

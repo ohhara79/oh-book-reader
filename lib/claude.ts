@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import path from "node:path";
 import {
   query,
   type Options,
@@ -64,6 +65,42 @@ function resolveClaudeExecutable(): string | undefined {
 
 const RESOLVED_CLAUDE_PATH = resolveClaudeExecutable();
 
+// The bundled `claude` binary's Bun stdin reader has two separate
+// "Unterminated string" parse-error bugs: one when fed by Node's
+// child_process pipe (lines ~220-280 KB after the SDK's initialize
+// control_request), and another when fed from a regular file FD
+// (lines ~280-300 KB). A kernel pipe sourced from `cat` parses every
+// size we tested, so the wrapper at bin/claude-buffered-stdin.sh
+// drains Node's stdin into a tempfile and pipes that file back into
+// the real binary via another `cat`. See
+// docs/plans/2026-05-12-05-claude-stdin-wrapper.md.
+function resolveStdinWrapper():
+  | { wrapper: string; real: string }
+  | undefined {
+  if (!RESOLVED_CLAUDE_PATH) return undefined;
+  if (process.platform === "win32") return undefined;
+  const wrapper = path.resolve(process.cwd(), "bin/claude-buffered-stdin.sh");
+  return { wrapper, real: RESOLVED_CLAUDE_PATH };
+}
+
+const STDIN_WRAPPER = resolveStdinWrapper();
+
+function executableOptions(): Pick<
+  Options,
+  "pathToClaudeCodeExecutable" | "env"
+> {
+  if (STDIN_WRAPPER) {
+    return {
+      pathToClaudeCodeExecutable: STDIN_WRAPPER.wrapper,
+      env: { ...process.env, CLAUDE_REAL_BIN: STDIN_WRAPPER.real },
+    };
+  }
+  if (RESOLVED_CLAUDE_PATH) {
+    return { pathToClaudeCodeExecutable: RESOLVED_CLAUDE_PATH };
+  }
+  return {};
+}
+
 const BASE_OPTIONS: Options = {
   model: MODEL_NAME,
   systemPrompt: SYSTEM_PROMPT,
@@ -72,9 +109,7 @@ const BASE_OPTIONS: Options = {
   tools: [],
   settingSources: [],
   maxTurns: 1,
-  ...(RESOLVED_CLAUDE_PATH
-    ? { pathToClaudeCodeExecutable: RESOLVED_CLAUDE_PATH }
-    : {}),
+  ...executableOptions(),
 };
 
 export type AskParams = {
@@ -280,9 +315,7 @@ export async function summarizeForTitle(
     tools: [],
     settingSources: [],
     maxTurns: 1,
-    ...(RESOLVED_CLAUDE_PATH
-      ? { pathToClaudeCodeExecutable: RESOLVED_CLAUDE_PATH }
-      : {}),
+    ...executableOptions(),
   };
 
   const run = async (): Promise<string | null> => {

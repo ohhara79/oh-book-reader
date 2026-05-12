@@ -287,6 +287,7 @@ function MathMarkdown({
             label={label}
             triggerClassName="inline-block max-w-full bg-transparent border-0 p-0"
             contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+            downloadSrc={src}
             trigger={
               // eslint-disable-next-line @next/next/no-img-element
               <img

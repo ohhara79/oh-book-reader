@@ -2148,6 +2148,7 @@ function ZoomableImage({
       label={alt}
       triggerClassName="border-0 bg-transparent p-0"
       contentClassName="dark:[filter:invert(1)_hue-rotate(180deg)] print:[filter:none]"
+      downloadSrc={src}
       trigger={
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={alt} className={className} />

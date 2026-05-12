@@ -13,7 +13,55 @@ type Props = {
   content?: ReactNode;
   /** SVG/HTML string used identically for both trigger and lightbox via dangerouslySetInnerHTML. */
   html?: string;
+  /** When set, the lightbox shows a download button that saves this URL/data URI. */
+  downloadSrc?: string;
 };
+
+const EXT_FROM_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+};
+
+const KNOWN_PATH_EXTS = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg"]);
+
+function slugify(s: string): string {
+  const cleaned = s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return cleaned.length > 0 ? cleaned : "image";
+}
+
+function extFromSrc(src: string): string {
+  if (src.startsWith("data:")) {
+    const mime = src.slice(5, src.indexOf(";")).toLowerCase();
+    return EXT_FROM_MIME[mime] ?? "bin";
+  }
+  try {
+    const u = new URL(src, "http://x");
+    const last = u.pathname.split("/").pop() ?? "";
+    const dot = last.lastIndexOf(".");
+    if (dot >= 0) {
+      const ext = last.slice(dot + 1).toLowerCase();
+      if (KNOWN_PATH_EXTS.has(ext)) return ext === "jpeg" ? "jpg" : ext;
+    }
+  } catch {}
+  return "png";
+}
+
+function triggerDownload(href: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 
 export default function ZoomableBlock({
   label,
@@ -22,6 +70,7 @@ export default function ZoomableBlock({
   trigger,
   content,
   html,
+  downloadSrc,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -82,6 +131,33 @@ export default function ZoomableBlock({
           >
             ×
           </button>
+          {downloadSrc && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerDownload(downloadSrc, `${slugify(label)}.${extFromSrc(downloadSrc)}`);
+              }}
+              aria-label={`Download ${label}`}
+              title={`Download ${label}`}
+              className="fixed right-12 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900/90 text-white shadow hover:opacity-90 dark:bg-white/90 dark:text-zinc-900"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 4v12" />
+                <path d="m7 11 5 5 5-5" />
+                <path d="M5 20h14" />
+              </svg>
+            </button>
+          )}
           <TransformWrapper
             minScale={0.5}
             maxScale={8}

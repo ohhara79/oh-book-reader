@@ -26,15 +26,15 @@ function quoteRiskyMermaidLabels(src: string): string {
   const esc = (s: string) => s.replace(/"/g, "#quot;");
   return src
     .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[(?!["[(/\\])([^\]\n]*?)\](?!\])/g,
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[(?!["[(/\\])([^\n]*?)\](?!\])/g,
       (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}["${esc(b)}"]` : m),
     )
     .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\{(?!["{])([^{}\n]*?)\}(?!\})/g,
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\{(?!["{])([^\n]*?)\}(?!\})/g,
       (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}{"${esc(b)}"}` : m),
     )
     .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\((?!["(])([^()\n]*?)\)(?!\))/g,
+      /(^|[\s\->|&;])([A-Za-z0-9_]+)\((?!["(])([^\n]*?)\)(?!\))/g,
       (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}("${esc(b)}")` : m),
     );
 }

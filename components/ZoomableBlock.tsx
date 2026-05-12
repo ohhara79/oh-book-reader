@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 type Props = {
@@ -119,7 +120,7 @@ export default function ZoomableBlock({
           {trigger}
         </button>
       )}
-      {open && (
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-sm print:hidden"
           role="dialog"
@@ -197,7 +198,8 @@ export default function ZoomableBlock({
               </div>
             </TransformComponent>
           </TransformWrapper>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

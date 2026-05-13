@@ -34,9 +34,16 @@ function quoteRiskyMermaidLabels(src: string): string {
     return `"\x00MMDQ${i}\x00"`;
   });
 
+  // Strip stray `<br>`/`<br/>`/`</br>` outside quoted labels. Mermaid accepts
+  // `<br/>` inside quoted strings (preserved by the mask above), but at the
+  // top level the `<` lexes as TAGSTART and aborts the whole diagram. LLMs
+  // occasionally emit these where a newline was meant; dropping them is safer
+  // than failing.
+  const stripped = masked.replace(/<\/?br\s*\/?>/gi, "");
+
   const TRIGGER = /[(){}[\]]/;
   const esc = (s: string) => s.replace(/"/g, "#quot;");
-  const wrapped = masked
+  const wrapped = stripped
     // Compound shapes — longer openers first so circle's `((` doesn't poach
     // from double-circle's `(((`.
     .replace(

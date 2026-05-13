@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import CopyButton from "./CopyButton";
 import ZoomableBlock from "./ZoomableBlock";
 
@@ -95,6 +95,13 @@ export default function MermaidDiagram({ code }: { code: string }) {
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     readPrefersDark() ? "dark" : "light",
   );
+  // Drive render, fallback `<pre>`s, and CopyButton off the same preprocessed
+  // string so what the user copies is the standards-compliant mermaid we
+  // actually hand to the renderer — not the (possibly invalid) raw input.
+  const preprocessedCode = useMemo(
+    () => quoteRiskyMermaidLabels(code),
+    [code],
+  );
 
   useEffect(() => {
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
@@ -116,7 +123,7 @@ export default function MermaidDiagram({ code }: { code: string }) {
           securityLevel: "strict",
           fontFamily: "inherit",
         });
-        const { svg } = await m.render(id, quoteRiskyMermaidLabels(code));
+        const { svg } = await m.render(id, preprocessedCode);
         if (!cancelled) setState({ kind: "ok", svg });
       } catch (e) {
         if (!cancelled) {
@@ -128,15 +135,19 @@ export default function MermaidDiagram({ code }: { code: string }) {
     return () => {
       cancelled = true;
     };
-  }, [code, theme, id]);
+  }, [preprocessedCode, theme, id]);
 
   if (state.kind === "loading") {
     return (
       <div className="relative group">
         <pre>
-          <code>{code}</code>
+          <code>{preprocessedCode}</code>
         </pre>
-        <CopyButton text={code} title="Copy mermaid source" className={COPY_BTN_CLS} />
+        <CopyButton
+          text={preprocessedCode}
+          title="Copy mermaid source"
+          className={COPY_BTN_CLS}
+        />
       </div>
     );
   }
@@ -146,9 +157,13 @@ export default function MermaidDiagram({ code }: { code: string }) {
         <summary>Diagram error: {state.msg}</summary>
         <div className="relative group">
           <pre className="mt-1">
-            <code>{code}</code>
+            <code>{preprocessedCode}</code>
           </pre>
-          <CopyButton text={code} title="Copy mermaid source" className={COPY_BTN_CLS} />
+          <CopyButton
+            text={preprocessedCode}
+            title="Copy mermaid source"
+            className={COPY_BTN_CLS}
+          />
         </div>
       </details>
     );
@@ -160,7 +175,11 @@ export default function MermaidDiagram({ code }: { code: string }) {
         triggerClassName="flex justify-center w-full bg-transparent border-0 p-0 text-left"
         html={state.svg}
       />
-      <CopyButton text={code} title="Copy mermaid source" className={COPY_BTN_CLS} />
+      <CopyButton
+        text={preprocessedCode}
+        title="Copy mermaid source"
+        className={COPY_BTN_CLS}
+      />
     </div>
   );
 }

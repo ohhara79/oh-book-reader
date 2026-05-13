@@ -301,6 +301,22 @@ export default function SelectionOverlay({
     });
   }
 
+  function showFocusTip(selectionIds: string[], anchorRect: DOMRect) {
+    const filtered = selectionIds.filter(
+      (sid) => (threadHeadingsBySelection[sid]?.length ?? 0) > 0,
+    );
+    if (filtered.length === 0) {
+      if (hoverTip) setHoverTip(null);
+      return;
+    }
+    setHoverTip({
+      source: "focus",
+      clientX: anchorRect.right,
+      clientY: anchorRect.bottom,
+      selectionIds: filtered,
+    });
+  }
+
   function cancelInertia() {
     if (inertiaRafRef.current !== null) {
       cancelAnimationFrame(inertiaRafRef.current);
@@ -536,7 +552,30 @@ export default function SelectionOverlay({
     if (!drag) return;
     const sel = drag;
     setDrag(null);
-    if (sel.w < MIN_DRAG_PX || sel.h < MIN_DRAG_PX) return;
+    if (sel.w < MIN_DRAG_PX || sel.h < MIN_DRAG_PX) {
+      // Touch long-press release without drag on an amber pin: reveal the
+      // linked-thread tooltip without opening the conversation. Pointer
+      // capture on the overlay swallows the synthesized click, so onFocus
+      // isn't a reliable trigger here — focus the primary button explicitly
+      // and set the tooltip directly.
+      if (e.pointerType === "touch") {
+        const ids = selectionIdsAtClient(e.clientX, e.clientY);
+        if (ids.length > 0) {
+          const primarySid = ids[0];
+          const primaryIdx = sortedPins.findIndex(
+            (pin) => pin.selectionId === primarySid && pin.isPrimary,
+          );
+          const btn =
+            primaryIdx >= 0 ? pinButtonRefs.current[primaryIdx] : null;
+          if (btn) {
+            btn.focus({ preventScroll: true });
+            onPinHover?.(primarySid);
+            showFocusTip(ids, btn.getBoundingClientRect());
+          }
+        }
+      }
+      return;
+    }
 
     const overlay = overlayRef.current;
     if (!overlay) return;
@@ -856,18 +895,10 @@ export default function SelectionOverlay({
           }}
           onFocus={(e) => {
             onPinHover?.(p.selectionId);
-            const headings = threadHeadingsBySelection[p.selectionId];
-            if (!headings || headings.length === 0) {
-              if (hoverTip) setHoverTip(null);
-              return;
-            }
-            const r = e.currentTarget.getBoundingClientRect();
-            setHoverTip({
-              source: "focus",
-              clientX: r.right,
-              clientY: r.bottom,
-              selectionIds: [p.selectionId],
-            });
+            showFocusTip(
+              [p.selectionId],
+              e.currentTarget.getBoundingClientRect(),
+            );
           }}
           onBlur={(e) => {
             const next = e.relatedTarget as HTMLElement | null;

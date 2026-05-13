@@ -68,7 +68,7 @@ export default function SvgBlock({ code }: { code: string }) {
         contentClassName="w-[90vw] h-[90vh] [&_svg]:w-full [&_svg]:h-full"
         html={state.html}
       />
-      <CopyButton text={code} title="Copy SVG source" className={COPY_BTN_CLS} />
+      <CopyButton text={state.html} title="Copy SVG source" className={COPY_BTN_CLS} />
     </div>
   );
 }

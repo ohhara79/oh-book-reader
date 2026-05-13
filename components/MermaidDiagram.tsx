@@ -24,9 +24,19 @@ function readPrefersDark(): boolean {
 // (()), ((())), {{}}) shapes. Skips parallelograms/trapezoids and the
 // asymmetric `>` shape, which are uncommon in model output.
 function quoteRiskyMermaidLabels(src: string): string {
+  // Mask already-quoted strings so the label-wrapping regexes don't recurse
+  // into their bodies. The placeholder keeps the surrounding `"` so the
+  // existing `(?!["...])` lookaheads still skip already-quoted outer shapes.
+  const strings: string[] = [];
+  const masked = src.replace(/"[^"\n]*"/g, (m) => {
+    const i = strings.length;
+    strings.push(m);
+    return `"\x00MMDQ${i}\x00"`;
+  });
+
   const TRIGGER = /[(){}[\]]/;
   const esc = (s: string) => s.replace(/"/g, "#quot;");
-  return src
+  const wrapped = masked
     // Compound shapes — longer openers first so circle's `((` doesn't poach
     // from double-circle's `(((`.
     .replace(
@@ -66,6 +76,8 @@ function quoteRiskyMermaidLabels(src: string): string {
       /(^|[\s\->|&;])([A-Za-z0-9_]+)\((?!["(])([^\n]*?)\)(?!\))/g,
       (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}("${esc(b)}")` : m),
     );
+
+  return wrapped.replace(/"\x00MMDQ(\d+)\x00"/g, (_, i) => strings[Number(i)]);
 }
 
 export default function MermaidDiagram({ code }: { code: string }) {

@@ -195,8 +195,8 @@ export default function Library() {
                 >
                   {b.title}
                 </Link>
-                <div className="flex items-center justify-between gap-3 md:contents">
-                  <span className="shrink-0 text-xs text-zinc-500">
+                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 md:contents">
+                  <span className="mr-auto shrink-0 text-xs text-zinc-500">
                     {b.page_count} pages · {formatTimestamp(b.uploaded_at)}
                   </span>
                   <div className="flex items-center gap-1">

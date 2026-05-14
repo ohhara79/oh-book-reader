@@ -16,9 +16,15 @@ function clearOhbrLocalStorage() {
   for (const k of keys) localStorage.removeItem(k);
 }
 
-export default function AppMenu() {
+type AppMenuProps = {
+  importing: boolean;
+  onImportFile: (file: File) => Promise<void> | void;
+};
+
+export default function AppMenu({ importing, onImportFile }: AppMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const { open: openShortcutsDialog } = useShortcutsDialog();
 
   useEffect(() => {
@@ -42,6 +48,17 @@ export default function AppMenu() {
     clearOhbrLocalStorage();
     setOpen(false);
     window.location.reload();
+  }
+
+  async function onImportChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOpen(false);
+    try {
+      await onImportFile(file);
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
   }
 
   return (
@@ -76,6 +93,22 @@ export default function AppMenu() {
           role="menu"
           className="absolute right-0 top-full z-10 mt-1 min-w-48 rounded border border-zinc-200 bg-white py-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
         >
+          <label
+            role="menuitem"
+            className={`block w-full px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700 ${
+              importing ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+            }`}
+          >
+            {importing ? "Importing…" : "Import book"}
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              disabled={importing}
+              onChange={onImportChange}
+            />
+          </label>
           <button
             type="button"
             role="menuitem"

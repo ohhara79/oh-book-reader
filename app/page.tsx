@@ -24,7 +24,6 @@ export default function Library() {
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
-  const importRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     const r = await fetch("/api/books");
@@ -131,9 +130,7 @@ export default function Library() {
     }
   }
 
-  async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function onImport(file: File) {
     setImporting(true);
     try {
       const fd = new FormData();
@@ -154,7 +151,6 @@ export default function Library() {
       await refresh();
     } finally {
       setImporting(false);
-      if (importRef.current) importRef.current.value = "";
     }
   }
 
@@ -174,18 +170,7 @@ export default function Library() {
               onChange={onUpload}
             />
           </label>
-          <label className="cursor-pointer rounded border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800">
-            {importing ? "Importing…" : "Import book"}
-            <input
-              ref={importRef}
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              disabled={importing}
-              onChange={onImport}
-            />
-          </label>
-          <AppMenu />
+          <AppMenu importing={importing} onImportFile={onImport} />
         </div>
       </header>
 

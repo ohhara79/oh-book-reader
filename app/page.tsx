@@ -269,19 +269,18 @@ export default function Library() {
                       </svg>
                     ) : (
                       <svg
-                        viewBox="0 0 16 16"
+                        viewBox="0 0 24 24"
                         width="16"
                         height="16"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.5"
+                        strokeWidth="2.25"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         aria-hidden="true"
                       >
-                        <path d="M8 2v8" />
-                        <path d="M4.5 7.5L8 11l3.5-3.5" />
-                        <path d="M3 13h10" />
+                        <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" />
+                        <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
                       </svg>
                     )}
                   </button>
@@ -309,20 +308,19 @@ export default function Library() {
                       </svg>
                     ) : (
                       <svg
-                        viewBox="0 0 16 16"
+                        viewBox="0 0 24 24"
                         width="16"
                         height="16"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.5"
+                        strokeWidth="2.25"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         aria-hidden="true"
                       >
-                        <path d="M2 5l6-3 6 3" />
-                        <path d="M2 5v8l6 3 6-3V5" />
-                        <path d="M2 5l6 3 6-3" />
-                        <path d="M8 8v8" />
+                        <rect x="2" y="3" width="20" height="5" rx="1" />
+                        <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                        <path d="M10 12h4" />
                       </svg>
                     )}
                   </button>

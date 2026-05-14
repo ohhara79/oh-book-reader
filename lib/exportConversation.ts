@@ -3,6 +3,7 @@ import type { CapturedSelection } from "@/components/SelectionOverlay";
 import { formatTimestamp } from "./formatTimestamp";
 import { isImageAttachment } from "./attachments";
 import { isAttachmentDocumentBlock } from "./promptParts";
+import { preprocessFencedDiagrams } from "./preprocessFencedDiagrams";
 
 export function extractUserQuestion(text: string): string {
   const m = text.match(/Question:\s*([\s\S]*)$/);
@@ -17,8 +18,11 @@ export function userVisibleTurnText(t: Turn): string {
     if (isAttachmentDocumentBlock(block)) continue;
     text += (text ? "\n" : "") + block.text;
   }
-  if (t.role === "user") text = extractUserQuestion(text);
-  return text;
+  if (t.role === "user") return extractUserQuestion(text);
+  // Assistant messages: rewrite ```mermaid and ```svg fence bodies so the
+  // copied/exported text matches what we render (and is valid in external
+  // tools). User and memo text stays verbatim.
+  return preprocessFencedDiagrams(text);
 }
 
 function pageLabel(spans: CapturedSelection["spans"]): string {

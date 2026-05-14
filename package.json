@@ -12,6 +12,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.119",
     "dompurify": "^3.4.2",
     "highlight.js": "^11.10.0",
+    "isomorphic-dompurify": "^3.12.0",
     "jszip": "^3.10.1",
     "katex": "^0.16.45",
     "mermaid": "^11.14.0",

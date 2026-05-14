@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import CopyButton from "./CopyButton";
 import ZoomableBlock from "./ZoomableBlock";
+import { quoteRiskyMermaidLabels } from "@/lib/mermaidPreprocess";
 
 const COPY_BTN_CLS =
   "absolute right-1 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
@@ -15,76 +16,6 @@ type RenderState =
 function readPrefersDark(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-// Wrap unquoted node labels in double quotes when their content contains
-// characters mermaid would misparse (e.g. `{` inside `[[...]]`). Mermaid's
-// parser treats quoted labels as opaque strings, so this is the official
-// escape hatch. Handles simple ([], {}, ()) and compound ([[]], [()], ([]),
-// (()), ((())), {{}}) shapes. Skips parallelograms/trapezoids and the
-// asymmetric `>` shape, which are uncommon in model output.
-function quoteRiskyMermaidLabels(src: string): string {
-  // Mask already-quoted strings so the label-wrapping regexes don't recurse
-  // into their bodies. The placeholder keeps the surrounding `"` so the
-  // existing `(?!["...])` lookaheads still skip already-quoted outer shapes.
-  const strings: string[] = [];
-  const masked = src.replace(/"[^"\n]*"/g, (m) => {
-    const i = strings.length;
-    strings.push(m);
-    return `"\x00MMDQ${i}\x00"`;
-  });
-
-  // Strip stray `<br>`/`<br/>`/`</br>` outside quoted labels. Mermaid accepts
-  // `<br/>` inside quoted strings (preserved by the mask above), but at the
-  // top level the `<` lexes as TAGSTART and aborts the whole diagram. LLMs
-  // occasionally emit these where a newline was meant; dropping them is safer
-  // than failing.
-  const stripped = masked.replace(/<\/?br\s*\/?>/gi, "");
-
-  const TRIGGER = /[(){}[\]]/;
-  const esc = (s: string) => s.replace(/"/g, "#quot;");
-  const wrapped = stripped
-    // Compound shapes — longer openers first so circle's `((` doesn't poach
-    // from double-circle's `(((`.
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\(\(\((?!")([^\n]*?)\)\)\)/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}((("${esc(b)}")))` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\(\((?!["(])([^\n]*?)\)\)(?!\))/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}(("${esc(b)}"))` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[\[(?!")([^\n]*?)\]\]/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}[["${esc(b)}"]]` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[\((?!")([^\n]*?)\)\]/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}[("${esc(b)}")]` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\(\[(?!")([^\n]*?)\]\)/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}(["${esc(b)}"])` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\{\{(?!")([^\n]*?)\}\}/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}{{"${esc(b)}"}}` : m),
-    )
-    // Simple shapes.
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\[(?!["[(/\\])([^\n]*?)\](?!\])/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}["${esc(b)}"]` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\{(?!["{])([^\n]*?)\}(?!\})/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}{"${esc(b)}"}` : m),
-    )
-    .replace(
-      /(^|[\s\->|&;])([A-Za-z0-9_]+)\((?!["(])([^\n]*?)\)(?!\))/g,
-      (m, p, i, b) => (TRIGGER.test(b) ? `${p}${i}("${esc(b)}")` : m),
-    );
-
-  return wrapped.replace(/"\x00MMDQ(\d+)\x00"/g, (_, i) => strings[Number(i)]);
 }
 
 export default function MermaidDiagram({ code }: { code: string }) {

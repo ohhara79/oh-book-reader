@@ -19,9 +19,12 @@ const bookStateKey = (id: string) => `ohbr.book.${id}`;
 export default function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
     const r = await fetch("/api/books");
@@ -103,6 +106,58 @@ export default function Library() {
     }
   }
 
+  async function onExportBackup(book: Book) {
+    setExporting((prev) => new Set(prev).add(book.id));
+    try {
+      const r = await fetch(`/api/books/${book.id}/backup`);
+      if (!r.ok) {
+        alert(`export failed: ${r.status} ${await r.text()}`);
+        return;
+      }
+      const disposition = r.headers.get("Content-Disposition") ?? "";
+      const match = /filename="([^"]+)"/.exec(disposition);
+      const slug = book.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      const filename = match?.[1] ?? `${slug || "book"}_${book.id}_backup.zip`;
+      triggerBlobDownload(await r.blob(), filename);
+    } finally {
+      setExporting((prev) => {
+        const next = new Set(prev);
+        next.delete(book.id);
+        return next;
+      });
+    }
+  }
+
+  async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/books/import", { method: "POST", body: fd });
+      if (!r.ok) {
+        const text = await r.text();
+        let message = `${r.status} ${text}`;
+        try {
+          const body = JSON.parse(text) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          // not JSON — keep the raw text
+        }
+        alert(`import failed: ${message}`);
+        return;
+      }
+      await refresh();
+    } finally {
+      setImporting(false);
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <header className="mb-8 flex items-center justify-between">
@@ -119,6 +174,17 @@ export default function Library() {
               onChange={onUpload}
             />
           </label>
+          <label className="cursor-pointer rounded border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800">
+            {importing ? "Importing…" : "Import book"}
+            <input
+              ref={importRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              disabled={importing}
+              onChange={onImport}
+            />
+          </label>
           <AppMenu />
         </div>
       </header>
@@ -132,6 +198,7 @@ export default function Library() {
           {books.map((b) => {
             const isDeleting = deleting.has(b.id);
             const isDownloading = downloading.has(b.id);
+            const isExporting = exporting.has(b.id);
             return (
               <li
                 key={b.id}
@@ -230,6 +297,47 @@ export default function Library() {
                         <path d="M8 2v8" />
                         <path d="M4.5 7.5L8 11l3.5-3.5" />
                         <path d="M3 13h10" />
+                      </svg>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onExportBackup(b)}
+                    disabled={isExporting}
+                    title={isExporting ? "Exporting…" : "Export book data"}
+                    aria-label={isExporting ? "Exporting…" : "Export book data"}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-zinc-600 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  >
+                    {isExporting ? (
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        className="animate-spin"
+                        aria-hidden="true"
+                      >
+                        <path d="M14 8a6 6 0 1 1-6-6" />
+                      </svg>
+                    ) : (
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M2 5l6-3 6 3" />
+                        <path d="M2 5v8l6 3 6-3V5" />
+                        <path d="M2 5l6 3 6-3" />
+                        <path d="M8 8v8" />
                       </svg>
                     )}
                   </button>

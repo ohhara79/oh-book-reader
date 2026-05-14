@@ -184,6 +184,10 @@ export function getBookPdfPath(bookId: string): string {
   return pdfPath(bookId);
 }
 
+export function getBookDir(bookId: string): string {
+  return bookDir(bookId);
+}
+
 export async function readBookPdf(bookId: string): Promise<Buffer> {
   return fs.readFile(pdfPath(bookId));
 }

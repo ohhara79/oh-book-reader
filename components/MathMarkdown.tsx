@@ -200,7 +200,7 @@ function MathCopyWrapper({
   if (display) {
     return (
       <span ref={ref} className="relative group block">
-        <span className={`${className ?? ""} block overflow-x-auto overflow-y-hidden overscroll-x-contain max-w-full`}>
+        <span className={`${className ?? ""} block overflow-x-auto overflow-y-hidden overscroll-x-contain max-w-full touch-pan-y`}>
           {children}
         </span>
         <CopyButton text={getLatex} title="Copy LaTeX" className={COPY_BTN_MATH_DISPLAY_CLS} />

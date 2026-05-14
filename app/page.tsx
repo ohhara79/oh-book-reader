@@ -199,131 +199,133 @@ export default function Library() {
                   <span className="shrink-0 text-xs text-zinc-500">
                     {b.page_count} pages · {formatTimestamp(b.uploaded_at)}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(b)}
-                    disabled={isDeleting}
-                    title={isDeleting ? "Deleting…" : "Delete"}
-                    aria-label={isDeleting ? "Deleting…" : "Delete"}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    {isDeleting ? (
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        className="animate-spin"
-                        aria-hidden="true"
-                      >
-                        <path d="M14 8a6 6 0 1 1-6-6" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M6 3.5h4" />
-                        <path d="M2.5 5.5h11" />
-                        <path d="M4.5 5.5l0.6 7.5a1 1 0 0 0 1 0.9h3.8a1 1 0 0 0 1-0.9l0.6-7.5" />
-                        <path d="M6.8 8v3.5" />
-                        <path d="M9.2 8v3.5" />
-                      </svg>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDownload(b)}
-                    disabled={isDownloading}
-                    title={
-                      isDownloading ? "Downloading…" : "Download all threads"
-                    }
-                    aria-label={
-                      isDownloading ? "Downloading…" : "Download all threads"
-                    }
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-zinc-600 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  >
-                    {isDownloading ? (
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        className="animate-spin"
-                        aria-hidden="true"
-                      >
-                        <path d="M14 8a6 6 0 1 1-6-6" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.25"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" />
-                        <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
-                      </svg>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onExportBackup(b)}
-                    disabled={isExporting}
-                    title={isExporting ? "Exporting…" : "Export book data"}
-                    aria-label={isExporting ? "Exporting…" : "Export book data"}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-zinc-600 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  >
-                    {isExporting ? (
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        className="animate-spin"
-                        aria-hidden="true"
-                      >
-                        <path d="M14 8a6 6 0 1 1-6-6" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.25"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <rect x="2" y="3" width="20" height="5" rx="1" />
-                        <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
-                        <path d="M10 12h4" />
-                      </svg>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onDelete(b)}
+                      disabled={isDeleting}
+                      title={isDeleting ? "Deleting…" : "Delete"}
+                      aria-label={isDeleting ? "Deleting…" : "Delete"}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-red-600 hover:text-red-800 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      {isDeleting ? (
+                        <svg
+                          viewBox="0 0 16 16"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        >
+                          <path d="M14 8a6 6 0 1 1-6-6" />
+                        </svg>
+                      ) : (
+                        <svg
+                          viewBox="0 0 16 16"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M6 3.5h4" />
+                          <path d="M2.5 5.5h11" />
+                          <path d="M4.5 5.5l0.6 7.5a1 1 0 0 0 1 0.9h3.8a1 1 0 0 0 1-0.9l0.6-7.5" />
+                          <path d="M6.8 8v3.5" />
+                          <path d="M9.2 8v3.5" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDownload(b)}
+                      disabled={isDownloading}
+                      title={
+                        isDownloading ? "Downloading…" : "Download all threads"
+                      }
+                      aria-label={
+                        isDownloading ? "Downloading…" : "Download all threads"
+                      }
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-zinc-600 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-zinc-400 dark:hover:text-zinc-200"
+                    >
+                      {isDownloading ? (
+                        <svg
+                          viewBox="0 0 16 16"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        >
+                          <path d="M14 8a6 6 0 1 1-6-6" />
+                        </svg>
+                      ) : (
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.25"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z" />
+                          <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onExportBackup(b)}
+                      disabled={isExporting}
+                      title={isExporting ? "Exporting…" : "Export book data"}
+                      aria-label={isExporting ? "Exporting…" : "Export book data"}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-zinc-600 hover:text-zinc-900 active:opacity-70 disabled:opacity-50 md:h-7 md:w-7 dark:text-zinc-400 dark:hover:text-zinc-200"
+                    >
+                      {isExporting ? (
+                        <svg
+                          viewBox="0 0 16 16"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          className="animate-spin"
+                          aria-hidden="true"
+                        >
+                          <path d="M14 8a6 6 0 1 1-6-6" />
+                        </svg>
+                      ) : (
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.25"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <rect x="2" y="3" width="20" height="5" rx="1" />
+                          <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                          <path d="M10 12h4" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </li>
             );

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 import ReactMarkdown, {
   defaultUrlTransform,
@@ -194,13 +194,35 @@ function MathCopyWrapper({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  // Default className is `touch-pan-y` so horizontal touch-pan on the wrapper
+  // doesn't out-claim the thread's vertical-pan gesture (otherwise touching
+  // empty space inside a non-overflowing math block shifts the whole thread
+  // sideways on iOS Safari). When the formula actually overflows, we relax to
+  // `auto` so the per-formula horizontal scrollbar — and finger drags on the
+  // formula — work as expected.
+  useLayoutEffect(() => {
+    if (!display) return;
+    const el = innerRef.current;
+    if (!el) return;
+    const update = () => {
+      el.style.touchAction = el.scrollWidth > el.clientWidth ? "auto" : "";
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
   const getLatex = () =>
     ref.current?.querySelector('annotation[encoding="application/x-tex"]')
       ?.textContent ?? "";
   if (display) {
     return (
       <span ref={ref} className="relative group block">
-        <span className={`${className ?? ""} block overflow-x-auto overflow-y-hidden overscroll-x-contain max-w-full touch-pan-y`}>
+        <span
+          ref={innerRef}
+          className={`${className ?? ""} block overflow-x-auto overflow-y-hidden overscroll-x-contain max-w-full touch-pan-y`}
+        >
           {children}
         </span>
         <CopyButton text={getLatex} title="Copy LaTeX" className={COPY_BTN_MATH_DISPLAY_CLS} />

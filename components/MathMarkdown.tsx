@@ -184,6 +184,33 @@ const COPY_BTN_MATH_DISPLAY_CLS =
 const COPY_BTN_PROSE_BLOCK_CLS =
   "absolute right-1 top-0 -translate-y-1/2 opacity-0 group-hover/prose:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100";
 
+function BlockScrollWrapper({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Mirrors the touch-action handling in MathCopyWrapper's display branch:
+  // default `touch-pan-y` so a touch on a non-overflowing wrapper doesn't
+  // out-claim the thread's vertical pan; relax to `auto` once the content
+  // actually overflows so the per-block horizontal scroll works.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      el.style.touchAction = el.scrollWidth > el.clientWidth ? "auto" : "";
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  return (
+    <div
+      ref={ref}
+      className="block overflow-x-auto overflow-y-hidden overscroll-x-contain max-w-full touch-pan-y"
+    >
+      {children}
+    </div>
+  );
+}
+
 function MathCopyWrapper({
   display,
   className,
@@ -364,11 +391,14 @@ function MathMarkdown({
       },
       table({ node, children, ...rest }) {
         const src = copyableSource(node, "table");
-        if (!src) return <table {...rest}>{children}</table>;
         return (
           <div className="relative group/prose">
-            <table {...rest}>{children}</table>
-            <CopyButton text={src} title="Copy table" className={COPY_BTN_PROSE_BLOCK_CLS} />
+            <BlockScrollWrapper>
+              <table {...rest}>{children}</table>
+            </BlockScrollWrapper>
+            {src && (
+              <CopyButton text={src} title="Copy table" className={COPY_BTN_PROSE_BLOCK_CLS} />
+            )}
           </div>
         );
       },

@@ -371,10 +371,11 @@ function MathMarkdown({
       },
       p({ node, children, ...rest }) {
         const src = copyableSource(node, "p");
-        if (!src) return <p {...rest}>{children}</p>;
+        const paragraph = <p {...rest}>{children}</p>;
+        if (!src) return <BlockScrollWrapper>{paragraph}</BlockScrollWrapper>;
         return (
           <div className="relative group/prose">
-            <p {...rest}>{children}</p>
+            <BlockScrollWrapper>{paragraph}</BlockScrollWrapper>
             <CopyButton text={src} title="Copy paragraph" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );

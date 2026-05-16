@@ -117,7 +117,19 @@ function rehypeMarkMathBlocks() {
 // untagged — this avoids stacked, redundant copy buttons (e.g. a <p> inside
 // a <blockquote> would otherwise render its own button on top of the
 // blockquote's).
-const COPYABLE_BLOCK_TAGS = new Set(["p", "blockquote", "table", "ul", "ol"]);
+const COPYABLE_BLOCK_TAGS = new Set([
+  "p",
+  "blockquote",
+  "table",
+  "ul",
+  "ol",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+]);
 
 function rehypeMarkCopyableBlocks() {
   return (tree: unknown) => {
@@ -420,6 +432,66 @@ function MathMarkdown({
           <div className="relative group/prose">
             <ol {...rest}>{children}</ol>
             <CopyButton text={src} title="Copy list" className={COPY_BTN_PROSE_BLOCK_CLS} />
+          </div>
+        );
+      },
+      h1({ node, children, ...rest }) {
+        const src = copyableSource(node, "h1");
+        if (!src) return <h1 {...rest}>{children}</h1>;
+        return (
+          <div className="relative group/prose">
+            <h1 {...rest}>{children}</h1>
+            <CopyButton text={src} title="Copy heading" className={COPY_BTN_PROSE_BLOCK_CLS} />
+          </div>
+        );
+      },
+      h2({ node, children, ...rest }) {
+        const src = copyableSource(node, "h2");
+        if (!src) return <h2 {...rest}>{children}</h2>;
+        return (
+          <div className="relative group/prose">
+            <h2 {...rest}>{children}</h2>
+            <CopyButton text={src} title="Copy heading" className={COPY_BTN_PROSE_BLOCK_CLS} />
+          </div>
+        );
+      },
+      h3({ node, children, ...rest }) {
+        const src = copyableSource(node, "h3");
+        if (!src) return <h3 {...rest}>{children}</h3>;
+        return (
+          <div className="relative group/prose">
+            <h3 {...rest}>{children}</h3>
+            <CopyButton text={src} title="Copy heading" className={COPY_BTN_PROSE_BLOCK_CLS} />
+          </div>
+        );
+      },
+      h4({ node, children, ...rest }) {
+        const src = copyableSource(node, "h4");
+        if (!src) return <h4 {...rest}>{children}</h4>;
+        return (
+          <div className="relative group/prose">
+            <h4 {...rest}>{children}</h4>
+            <CopyButton text={src} title="Copy heading" className={COPY_BTN_PROSE_BLOCK_CLS} />
+          </div>
+        );
+      },
+      h5({ node, children, ...rest }) {
+        const src = copyableSource(node, "h5");
+        if (!src) return <h5 {...rest}>{children}</h5>;
+        return (
+          <div className="relative group/prose">
+            <h5 {...rest}>{children}</h5>
+            <CopyButton text={src} title="Copy heading" className={COPY_BTN_PROSE_BLOCK_CLS} />
+          </div>
+        );
+      },
+      h6({ node, children, ...rest }) {
+        const src = copyableSource(node, "h6");
+        if (!src) return <h6 {...rest}>{children}</h6>;
+        return (
+          <div className="relative group/prose">
+            <h6 {...rest}>{children}</h6>
+            <CopyButton text={src} title="Copy heading" className={COPY_BTN_PROSE_BLOCK_CLS} />
           </div>
         );
       },

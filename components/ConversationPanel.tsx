@@ -2007,7 +2007,7 @@ export default function ConversationPanel({
                   </svg>
                 )}
               </button>
-              {active?.kind === "new" && (
+              {active?.kind === "new" && messages.length === 0 && (
                 <button
                   type="button"
                   onClick={() => setTextOnly((v) => !v)}

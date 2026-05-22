@@ -1211,7 +1211,10 @@ export default function Reader({ bookId }: { bookId: string }) {
   }, [numPages]);
 
   return (
-    <div className="flex h-screen flex-col print:block print:h-auto">
+    <div
+      className="flex h-screen flex-col print:block print:h-auto"
+      style={opacity < 1 ? { opacity } : undefined}
+    >
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
@@ -1556,7 +1559,6 @@ export default function Reader({ bookId }: { bookId: string }) {
               style={{
                 width: contentSize.width || undefined,
                 minHeight: contentSize.height || undefined,
-                ...(opacity < 1 ? { opacity } : null),
                 ...(pinch
                   ? {
                       transform: `scale(${pinch.ratio})`,

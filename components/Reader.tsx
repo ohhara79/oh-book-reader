@@ -1541,7 +1541,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         <main
           ref={mainRef}
           tabIndex={-1}
-          className="flex-1 overflow-auto bg-zinc-100 p-6 outline-none print:hidden dark:bg-zinc-900"
+          className="flex-1 overflow-auto bg-zinc-100 p-6 outline-none print:hidden dark:bg-black"
           style={{ touchAction: "pan-x pan-y", overflowAnchor: "none" }}
         >
           <Document

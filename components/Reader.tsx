@@ -70,6 +70,10 @@ const DEFAULT_SCALE = 1.4;
 const SCALE_MIN = 0.5;
 const SCALE_MAX = 3;
 const SCALE_STEP = 0.1;
+const DEFAULT_OPACITY = 1;
+const OPACITY_MIN = 0.1;
+const OPACITY_MAX = 1;
+const OPACITY_STEP = 0.1;
 const PAGE_GAP_PX = 16;
 const RENDER_BUFFER = 2;
 const DIMS_FETCH_CONCURRENCY = 16;
@@ -85,6 +89,7 @@ function clampSidebarWidth(w: number) {
 type StoredBookState = {
   page?: number;
   scale?: number;
+  opacity?: number;
   scrollTop?: number;
   scrollLeft?: number;
 };
@@ -106,6 +111,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [book, setBook] = useState<Book | null>(null);
   const [pageNum, setPageNum] = useState(DEFAULT_PAGE);
   const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [opacity, setOpacity] = useState(DEFAULT_OPACITY);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [intrinsicDims, setIntrinsicDims] = useState<
     Record<number, IntrinsicDims>
@@ -130,6 +136,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const zoomMenuWrapperRef = useRef<HTMLDivElement>(null);
   const zoomMenuPopoverRef = useRef<HTMLDivElement>(null);
+  const [opacityMenuOpen, setOpacityMenuOpen] = useState(false);
+  const opacityMenuWrapperRef = useRef<HTMLDivElement>(null);
+  const opacityMenuPopoverRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageWrapperRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -137,6 +146,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const pageTextCacheRef = useRef<Map<number, Promise<string>>>(new Map());
   const pageNumRef = useRef(pageNum);
   const scaleRef = useRef(scale);
+  const opacityRef = useRef(opacity);
   const ioRafRef = useRef<number | null>(null);
   const suppressIoUntilRef = useRef(0);
   const restoreScrollDoneRef = useRef(false);
@@ -155,6 +165,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   useEffect(() => {
     scaleRef.current = scale;
   }, [scale]);
+  useEffect(() => {
+    opacityRef.current = opacity;
+  }, [opacity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,6 +203,14 @@ export default function Reader({ bookId }: { bookId: string }) {
       if (Number.isFinite(stored.scale)) {
         setScale(
           Math.min(SCALE_MAX, Math.max(SCALE_MIN, stored.scale as number)),
+        );
+      }
+      if (Number.isFinite(stored.opacity)) {
+        setOpacity(
+          Math.min(
+            OPACITY_MAX,
+            Math.max(OPACITY_MIN, stored.opacity as number),
+          ),
         );
       }
       if (
@@ -253,6 +274,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     const payload: StoredBookState = {
       page: pageNumRef.current,
       scale: scaleRef.current,
+      opacity: opacityRef.current,
     };
     if (main) {
       if (Number.isFinite(main.scrollTop) && main.scrollTop >= 0) {
@@ -269,7 +291,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (!hydrated) return;
     if (!restoreScrollDoneRef.current) return;
     persistBookState();
-  }, [bookId, pageNum, scale, hydrated, persistBookState]);
+  }, [bookId, pageNum, scale, opacity, hydrated, persistBookState]);
 
   useEffect(() => {
     if (numPages == null) return;
@@ -604,6 +626,11 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
   };
 
+  const stepOpacity = (delta: number) => {
+    const next = Math.max(OPACITY_MIN, Math.min(OPACITY_MAX, opacity + delta));
+    setOpacity(Math.round(next * 10) / 10);
+  };
+
   // Live preview during pinch. Avoids re-rasterizing every Page canvas
   // each frame (which is what scale state updates trigger). The actual
   // scale only commits at gesture end.
@@ -811,6 +838,42 @@ export default function Reader({ bookId }: { bookId: string }) {
     window.addEventListener("resize", adjust);
     return () => window.removeEventListener("resize", adjust);
   }, [zoomMenuOpen]);
+
+  useEffect(() => {
+    if (!opacityMenuOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      if (!opacityMenuWrapperRef.current?.contains(e.target as Node)) {
+        setOpacityMenuOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpacityMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [opacityMenuOpen]);
+  useLayoutEffect(() => {
+    if (!opacityMenuOpen) return;
+    const adjust = () => {
+      const el = opacityMenuPopoverRef.current;
+      if (!el) return;
+      el.style.transform = "";
+      const rect = el.getBoundingClientRect();
+      const padding = 8;
+      let shift = 0;
+      if (rect.left < padding) shift = padding - rect.left;
+      else if (rect.right > window.innerWidth - padding)
+        shift = window.innerWidth - padding - rect.right;
+      if (shift !== 0) el.style.transform = `translateX(${shift}px)`;
+    };
+    adjust();
+    window.addEventListener("resize", adjust);
+    return () => window.removeEventListener("resize", adjust);
+  }, [opacityMenuOpen]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1343,6 +1406,107 @@ export default function Reader({ bookId }: { bookId: string }) {
               </div>
             )}
           </div>
+          <div ref={opacityMenuWrapperRef} className="relative ml-1">
+            <button
+              type="button"
+              onClick={() => setOpacityMenuOpen((o) => !o)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded border hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+              aria-haspopup="dialog"
+              aria-expanded={opacityMenuOpen}
+              aria-label={`Opacity, currently ${Math.round(opacity * 100)}%`}
+              title={`Opacity (${Math.round(opacity * 100)}%)`}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="8" cy="8" r="5" />
+                <path d="M8 3 A5 5 0 0 1 8 13 Z" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+            {opacityMenuOpen && (
+              <div
+                ref={opacityMenuPopoverRef}
+                role="dialog"
+                aria-label="Opacity"
+                className="absolute right-0 top-full z-30 mt-1 flex w-56 items-center gap-1 rounded border border-zinc-200 bg-white p-1 shadow-md dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <button
+                  type="button"
+                  onClick={() => stepOpacity(-OPACITY_STEP)}
+                  disabled={opacity <= OPACITY_MIN}
+                  title={`Decrease opacity (${Math.round(opacity * 100)}%)`}
+                  aria-label={`Decrease opacity, currently ${Math.round(opacity * 100)}%`}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 8 L12 8" />
+                  </svg>
+                </button>
+                <input
+                  type="range"
+                  min={OPACITY_MIN}
+                  max={OPACITY_MAX}
+                  step={OPACITY_STEP}
+                  value={opacity}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    setOpacity(Math.round(n * 10) / 10);
+                  }}
+                  title={`Opacity (${Math.round(opacity * 100)}%)`}
+                  aria-label={`Opacity, currently ${Math.round(opacity * 100)}%`}
+                  className="h-1 min-w-0 flex-1 cursor-pointer accent-zinc-500 dark:accent-zinc-400"
+                />
+                <span
+                  className="min-w-[2.5rem] shrink-0 text-center text-[10px] tabular-nums text-zinc-500"
+                  aria-hidden="true"
+                >
+                  {Math.round(opacity * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => stepOpacity(OPACITY_STEP)}
+                  disabled={opacity >= OPACITY_MAX}
+                  title={`Increase opacity (${Math.round(opacity * 100)}%)`}
+                  aria-label={`Increase opacity, currently ${Math.round(opacity * 100)}%`}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 active:opacity-70 disabled:opacity-40 dark:hover:text-zinc-100"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 8 L12 8" />
+                    <path d="M8 4 L8 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -1392,6 +1556,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               style={{
                 width: contentSize.width || undefined,
                 minHeight: contentSize.height || undefined,
+                ...(opacity < 1 ? { opacity } : null),
                 ...(pinch
                   ? {
                       transform: `scale(${pinch.ratio})`,

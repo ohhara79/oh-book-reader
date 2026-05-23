@@ -1710,6 +1710,7 @@ export default function Reader({ bookId }: { bookId: string }) {
               setActive({ kind: "existing", conversationId });
             }}
             onCreated={onConversationCreated}
+            onHidePanel={() => setSidebarHidden(true)}
             onClose={() => {
               const sel = pinFocusSelectionIdRef.current;
               pinFocusSelectionIdRef.current = null;

@@ -339,6 +339,7 @@ type Props = {
   onOpenConversation: (conversationId: string) => void;
   onCreated: () => void;
   onClose: () => void;
+  onHidePanel?: () => void;
   onThreadHover?: (selectionId: string | null, pages: number[]) => void;
   highlightedSelectionId?: string | null;
   initialListScrollTop?: number;
@@ -383,6 +384,7 @@ export default function ConversationPanel({
   onOpenConversation,
   onCreated,
   onClose,
+  onHidePanel,
   onThreadHover,
   highlightedSelectionId = null,
   initialListScrollTop = 0,
@@ -1533,6 +1535,30 @@ export default function ConversationPanel({
               </svg>
             </button>
           </div>
+        )}
+        {!active && onHidePanel && (
+          <button
+            type="button"
+            onClick={onHidePanel}
+            aria-label="Hide panel"
+            title="Hide panel"
+            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded border hover:bg-zinc-100 active:bg-zinc-200 md:hidden dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="2" y="3" width="12" height="10" rx="1.5" />
+              <path d="M10 3v10" />
+            </svg>
+          </button>
         )}
       </div>
       {rawConversation && (

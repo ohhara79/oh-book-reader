@@ -1542,7 +1542,7 @@ export default function ConversationPanel({
             onClick={onHidePanel}
             aria-label="Hide panel"
             title="Hide panel"
-            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded border hover:bg-zinc-100 active:bg-zinc-200 md:hidden dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
+            className="inline-flex h-7 w-7 items-center justify-center rounded border hover:bg-zinc-100 active:bg-zinc-200 md:hidden dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
           >
             <svg
               viewBox="0 0 16 16"

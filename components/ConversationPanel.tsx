@@ -348,7 +348,6 @@ type Props = {
   onRequestPageChange?: (page: number) => void;
   chromeHidden?: boolean;
   onToggleChrome?: () => void;
-  onUserScroll?: () => void;
 };
 
 type DisplayMessage =
@@ -393,7 +392,6 @@ export default function ConversationPanel({
   onRequestPageChange,
   chromeHidden = false,
   onToggleChrome,
-  onUserScroll,
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -511,17 +509,6 @@ export default function ConversationPanel({
   const lastScrollTopRef = useRef(0);
   const tapStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
 
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el || !onUserScroll) return;
-    const onAct = () => onUserScroll();
-    el.addEventListener("wheel", onAct, { passive: true });
-    el.addEventListener("touchmove", onAct, { passive: true });
-    return () => {
-      el.removeEventListener("wheel", onAct);
-      el.removeEventListener("touchmove", onAct);
-    };
-  }, [onUserScroll]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

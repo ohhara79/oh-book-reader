@@ -78,6 +78,8 @@ const OPACITY_STEP = 0.1;
 const PAGE_GAP_PX = 16;
 const RENDER_BUFFER = 2;
 const DIMS_FETCH_CONCURRENCY = 16;
+const IDLE_HIDE_MS = 4000;
+const POINTERMOVE_THROTTLE_MS = 150;
 
 function clampSidebarWidth(w: number) {
   const max = Math.min(
@@ -126,7 +128,9 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [chromeHidden, setChromeHidden] = useState(false);
-  const autoHideArmedRef = useRef(false);
+  const hideReasonRef = useRef<"manual" | "idle" | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastActivityRef = useRef(0);
   const [hydrated, setHydrated] = useState(false);
   const [restoreSignal, setRestoreSignal] = useState(0);
   const [hoveredSelectionId, setHoveredSelectionId] = useState<string | null>(
@@ -196,7 +200,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     const ch = localStorage.getItem(CHROME_HIDDEN_KEY);
     const chromeStartHidden = ch === "1";
     if (chromeStartHidden) setChromeHidden(true);
-    autoHideArmedRef.current = !chromeStartHidden;
+    hideReasonRef.current = chromeStartHidden ? "manual" : null;
 
     restoreScrollDoneRef.current = false;
     pendingScrollTopRef.current = null;
@@ -270,29 +274,92 @@ export default function Reader({ bookId }: { bookId: string }) {
     localStorage.setItem(CHROME_HIDDEN_KEY, chromeHidden ? "1" : "0");
   }, [chromeHidden, hydrated]);
 
-  const handleUserScroll = useCallback(() => {
-    if (!autoHideArmedRef.current) return;
-    autoHideArmedRef.current = false;
-    setChromeHidden(true);
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current != null) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
   }, []);
 
+  const armIdleTimer = useCallback(() => {
+    clearIdleTimer();
+    const fire = () => {
+      idleTimerRef.current = null;
+      const ae = document.activeElement as HTMLElement | null;
+      if (
+        ae &&
+        (ae.tagName === "INPUT" ||
+          ae.tagName === "TEXTAREA" ||
+          ae.isContentEditable)
+      ) {
+        idleTimerRef.current = setTimeout(fire, IDLE_HIDE_MS);
+        return;
+      }
+      if (typeof window !== "undefined" && window.getSelection()?.toString()) {
+        idleTimerRef.current = setTimeout(fire, IDLE_HIDE_MS);
+        return;
+      }
+      if (document.querySelector('[role="dialog"]')) {
+        idleTimerRef.current = setTimeout(fire, IDLE_HIDE_MS);
+        return;
+      }
+      setChromeHidden((cur) => {
+        if (cur) return cur;
+        hideReasonRef.current = "idle";
+        return true;
+      });
+    };
+    idleTimerRef.current = setTimeout(fire, IDLE_HIDE_MS);
+  }, [clearIdleTimer]);
+
   const toggleChrome = useCallback(() => {
-    autoHideArmedRef.current = false;
-    setChromeHidden((v) => !v);
-  }, []);
+    setChromeHidden((v) => {
+      const next = !v;
+      if (next) {
+        hideReasonRef.current = "manual";
+        clearIdleTimer();
+      } else {
+        hideReasonRef.current = null;
+        armIdleTimer();
+      }
+      return next;
+    });
+  }, [armIdleTimer, clearIdleTimer]);
 
   useEffect(() => {
     if (!hydrated) return;
-    const main = mainRef.current;
-    if (!main) return;
-    const onAct = () => handleUserScroll();
-    main.addEventListener("wheel", onAct, { passive: true });
-    main.addEventListener("touchmove", onAct, { passive: true });
-    return () => {
-      main.removeEventListener("wheel", onAct);
-      main.removeEventListener("touchmove", onAct);
+    const onActivity = (e: Event) => {
+      if (e.type === "pointermove") {
+        const now = Date.now();
+        if (now - lastActivityRef.current < POINTERMOVE_THROTTLE_MS) return;
+        lastActivityRef.current = now;
+      }
+      if (hideReasonRef.current === "manual") return;
+      setChromeHidden((cur) => {
+        if (cur) {
+          hideReasonRef.current = null;
+          return false;
+        }
+        return cur;
+      });
+      armIdleTimer();
     };
-  }, [hydrated, handleUserScroll]);
+    const opts = { passive: true, capture: true } as const;
+    document.addEventListener("pointermove", onActivity, opts);
+    document.addEventListener("pointerdown", onActivity, opts);
+    document.addEventListener("keydown", onActivity, opts);
+    document.addEventListener("wheel", onActivity, opts);
+    document.addEventListener("touchstart", onActivity, opts);
+    if (hideReasonRef.current !== "manual") armIdleTimer();
+    return () => {
+      document.removeEventListener("pointermove", onActivity, opts);
+      document.removeEventListener("pointerdown", onActivity, opts);
+      document.removeEventListener("keydown", onActivity, opts);
+      document.removeEventListener("wheel", onActivity, opts);
+      document.removeEventListener("touchstart", onActivity, opts);
+      clearIdleTimer();
+    };
+  }, [hydrated, armIdleTimer, clearIdleTimer]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1737,7 +1804,6 @@ export default function Reader({ bookId }: { bookId: string }) {
             }}
             chromeHidden={chromeHidden}
             onToggleChrome={toggleChrome}
-            onUserScroll={handleUserScroll}
           />
         </aside>
       </div>

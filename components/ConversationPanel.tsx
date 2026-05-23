@@ -1258,9 +1258,10 @@ export default function ConversationPanel({
   const showThreadListControls = !active && totalThreadCount > 0;
 
   return (
-    <div className="flex h-full flex-col print:h-auto">
+    <div className="relative flex h-full flex-col print:h-auto">
       <div
-        className={`${chromeHidden ? "hidden" : "flex"} flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 px-3 py-1 text-sm print:hidden dark:border-zinc-800`}
+        aria-hidden={chromeHidden}
+        className={`absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 bg-white px-3 py-1 text-sm transition-opacity duration-200 print:hidden dark:border-zinc-800 dark:bg-black ${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`}
       >
         <div
           className={
@@ -1681,8 +1682,9 @@ export default function ConversationPanel({
             setDragActive(false);
             void addFiles(files);
           }}
-          className={`border-t px-2 py-1 transition-colors print:hidden ${
-            chromeHidden ? "hidden" : ""
+          aria-hidden={chromeHidden}
+          className={`absolute inset-x-0 bottom-0 z-10 border-t bg-white px-2 py-1 transition-[opacity,background-color,border-color] duration-200 print:hidden dark:bg-black ${
+            chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"
           } ${
             dragActive
               ? "border-zinc-400 bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900/60"

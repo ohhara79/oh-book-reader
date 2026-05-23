@@ -1248,11 +1248,12 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   return (
     <div
-      className="flex h-screen flex-col print:block print:h-auto"
+      className="relative flex h-screen flex-col print:block print:h-auto"
       style={opacity < 1 ? { opacity } : undefined}
     >
       <header
-        className={`${chromeHidden ? "hidden" : "flex"} items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black`}
+        aria-hidden={chromeHidden}
+        className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 transition-opacity duration-200 print:hidden dark:border-zinc-800 dark:bg-black ${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link

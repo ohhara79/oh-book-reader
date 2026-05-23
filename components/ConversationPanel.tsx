@@ -345,6 +345,9 @@ type Props = {
   onListScrollSave?: (scrollTop: number) => void;
   initialFocusConvId?: string | null;
   onRequestPageChange?: (page: number) => void;
+  chromeHidden?: boolean;
+  onToggleChrome?: () => void;
+  onUserScroll?: () => void;
 };
 
 type DisplayMessage =
@@ -386,6 +389,9 @@ export default function ConversationPanel({
   onListScrollSave,
   initialFocusConvId = null,
   onRequestPageChange,
+  chromeHidden = false,
+  onToggleChrome,
+  onUserScroll,
 }: Props) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -501,6 +507,19 @@ export default function ConversationPanel({
   });
   const stickToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
+  const tapStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || !onUserScroll) return;
+    const onAct = () => onUserScroll();
+    el.addEventListener("wheel", onAct, { passive: true });
+    el.addEventListener("touchmove", onAct, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", onAct);
+      el.removeEventListener("touchmove", onAct);
+    };
+  }, [onUserScroll]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1240,7 +1259,9 @@ export default function ConversationPanel({
 
   return (
     <div className="flex h-full flex-col print:h-auto">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 px-3 py-1 text-sm print:hidden dark:border-zinc-800">
+      <div
+        className={`${chromeHidden ? "hidden" : "flex"} flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 px-3 py-1 text-sm print:hidden dark:border-zinc-800`}
+      >
         <div
           className={
             showThreadListControls
@@ -1533,6 +1554,38 @@ export default function ConversationPanel({
             stickToBottomRef.current = true;
           }
           lastScrollTopRef.current = newScrollTop;
+        }}
+        onPointerDown={(e) => {
+          if (!onToggleChrome) return;
+          if (!e.isPrimary || e.button !== 0) return;
+          tapStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            t: performance.now(),
+          };
+        }}
+        onPointerUp={(e) => {
+          const start = tapStartRef.current;
+          tapStartRef.current = null;
+          if (!onToggleChrome || !start) return;
+          if (!e.isPrimary) return;
+          const dx = e.clientX - start.x;
+          const dy = e.clientY - start.y;
+          if (dx * dx + dy * dy > 25) return;
+          if (performance.now() - start.t > 250) return;
+          if (window.getSelection()?.toString()) return;
+          const target = e.target as HTMLElement | null;
+          if (
+            target?.closest(
+              'button,a,input,textarea,select,label,[role="button"]',
+            )
+          ) {
+            return;
+          }
+          onToggleChrome();
+        }}
+        onPointerCancel={() => {
+          tapStartRef.current = null;
         }}
         style={{ touchAction: "pan-y" }}
         className="flex-1 overflow-auto px-3 py-2 outline-none print:overflow-visible"

@@ -62,6 +62,7 @@ const SIDEBAR_MIN = 320;
 const SIDEBAR_MAX_HARD = 1200;
 const SIDEBAR_WIDTH_KEY = "ohbr.sidebarWidth";
 const SIDEBAR_HIDDEN_KEY = "ohbr.sidebarHidden";
+const CHROME_HIDDEN_KEY = "ohbr.chromeHidden";
 const bookStateKey = (id: string) => `ohbr.book.${id}`;
 const activeThreadKey = (id: string) => `ohbr.activeThread.${id}`;
 
@@ -124,6 +125,8 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [active, setActive] = useState<ActiveConversation | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const autoHideArmedRef = useRef(false);
   const [hydrated, setHydrated] = useState(false);
   const [restoreSignal, setRestoreSignal] = useState(0);
   const [hoveredSelectionId, setHoveredSelectionId] = useState<string | null>(
@@ -190,6 +193,10 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
     const h = localStorage.getItem(SIDEBAR_HIDDEN_KEY);
     if (h === "1") setSidebarHidden(true);
+    const ch = localStorage.getItem(CHROME_HIDDEN_KEY);
+    const chromeStartHidden = ch === "1";
+    if (chromeStartHidden) setChromeHidden(true);
+    autoHideArmedRef.current = !chromeStartHidden;
 
     restoreScrollDoneRef.current = false;
     pendingScrollTopRef.current = null;
@@ -257,6 +264,35 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (!hydrated) return;
     localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden ? "1" : "0");
   }, [sidebarHidden, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(CHROME_HIDDEN_KEY, chromeHidden ? "1" : "0");
+  }, [chromeHidden, hydrated]);
+
+  const handleUserScroll = useCallback(() => {
+    if (!autoHideArmedRef.current) return;
+    autoHideArmedRef.current = false;
+    setChromeHidden(true);
+  }, []);
+
+  const toggleChrome = useCallback(() => {
+    autoHideArmedRef.current = false;
+    setChromeHidden((v) => !v);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const main = mainRef.current;
+    if (!main) return;
+    const onAct = () => handleUserScroll();
+    main.addEventListener("wheel", onAct, { passive: true });
+    main.addEventListener("touchmove", onAct, { passive: true });
+    return () => {
+      main.removeEventListener("wheel", onAct);
+      main.removeEventListener("touchmove", onAct);
+    };
+  }, [hydrated, handleUserScroll]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1215,7 +1251,9 @@ export default function Reader({ bookId }: { bookId: string }) {
       className="flex h-screen flex-col print:block print:h-auto"
       style={opacity < 1 ? { opacity } : undefined}
     >
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black">
+      <header
+        className={`${chromeHidden ? "hidden" : "flex"} items-center justify-between border-b border-zinc-200 bg-white px-4 py-2 print:hidden dark:border-zinc-800 dark:bg-black`}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
             href="/"
@@ -1612,6 +1650,7 @@ export default function Reader({ bookId }: { bookId: string }) {
                   onPinHover={handlePinHover}
                   onPinEscape={() => mainRef.current?.focus({ preventScroll: true })}
                   getPageText={getPageText}
+                  onEmptyTap={toggleChrome}
                 />
               )}
             </div>
@@ -1694,6 +1733,9 @@ export default function Reader({ bookId }: { bookId: string }) {
               setPageNum(n);
               scrollToPage(n, false);
             }}
+            chromeHidden={chromeHidden}
+            onToggleChrome={toggleChrome}
+            onUserScroll={handleUserScroll}
           />
         </aside>
       </div>

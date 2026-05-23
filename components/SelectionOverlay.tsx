@@ -66,6 +66,7 @@ type Props = {
   onPinHover?: (selectionId: string | null) => void;
   onPinEscape?: () => void;
   getPageText: (n: number) => Promise<string>;
+  onEmptyTap?: () => void;
 };
 
 type StackPicker = {
@@ -110,6 +111,7 @@ export default function SelectionOverlay({
   onPinHover,
   onPinEscape,
   getPageText,
+  onEmptyTap,
 }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -534,6 +536,9 @@ export default function SelectionOverlay({
       return;
     }
     const wasArmed = armedRef.current;
+    const wasPanActive = panActiveRef.current;
+    const hadShortMovement = pointerStartRef.current !== null;
+    const isOverlayTarget = e.target === e.currentTarget;
     if (panActiveRef.current && panScrollerRef.current) {
       const samples = panSamplesRef.current;
       if (samples.length >= 2) {
@@ -548,6 +553,27 @@ export default function SelectionOverlay({
       }
     }
     resetGesture();
+    // Empty-area tap → toggle chrome. Mouse: armSelection fires on pointerdown,
+    // so a click without drag leaves us armed with drag w/h ~0. Touch: no
+    // long-press → never armed, but pointerStartRef survives if movement
+    // stayed under TOUCH_CANCEL_MOVE_PX.
+    if (isOverlayTarget && !wasPanActive && onEmptyTap) {
+      const isMouseTap =
+        e.pointerType !== "touch" &&
+        wasArmed &&
+        drag !== null &&
+        drag.w < MIN_DRAG_PX &&
+        drag.h < MIN_DRAG_PX;
+      const isTouchTap =
+        e.pointerType === "touch" && !wasArmed && hadShortMovement;
+      if (isMouseTap || isTouchTap) {
+        if (!window.getSelection()?.toString()) {
+          onEmptyTap();
+          if (drag) setDrag(null);
+          return;
+        }
+      }
+    }
     if (!wasArmed) return;
     if (!drag) return;
     const sel = drag;

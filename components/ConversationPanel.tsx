@@ -1263,7 +1263,7 @@ export default function ConversationPanel({
     <div className="relative flex h-full flex-col print:h-auto">
       <div
         aria-hidden={chromeHidden}
-        className={`absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 bg-white px-3 py-1 text-sm transition-opacity duration-200 print:hidden dark:border-zinc-800 dark:bg-black ${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`}
+        className={`absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-200 bg-white px-4 py-2 text-sm transition-opacity duration-200 md:px-3 md:py-1 print:hidden dark:border-zinc-800 dark:bg-black ${chromeHidden ? "pointer-events-none opacity-0" : "opacity-100"}`}
       >
         <div
           className={
@@ -1546,8 +1546,8 @@ export default function ConversationPanel({
           >
             <svg
               viewBox="0 0 16 16"
-              width="14"
-              height="14"
+              width="16"
+              height="16"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"

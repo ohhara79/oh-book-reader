@@ -128,6 +128,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [chromeHidden, setChromeHidden] = useState(false);
+  const chromeHiddenRef = useRef(false);
   const hideReasonRef = useRef<"manual" | "idle" | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef(0);
@@ -274,6 +275,10 @@ export default function Reader({ bookId }: { bookId: string }) {
     localStorage.setItem(CHROME_HIDDEN_KEY, chromeHidden ? "1" : "0");
   }, [chromeHidden, hydrated]);
 
+  useEffect(() => {
+    chromeHiddenRef.current = chromeHidden;
+  }, [chromeHidden]);
+
   const clearIdleTimer = useCallback(() => {
     if (idleTimerRef.current != null) {
       clearTimeout(idleTimerRef.current);
@@ -313,18 +318,10 @@ export default function Reader({ bookId }: { bookId: string }) {
   }, [clearIdleTimer]);
 
   const toggleChrome = useCallback(() => {
-    setChromeHidden((v) => {
-      const next = !v;
-      if (next) {
-        hideReasonRef.current = "manual";
-        clearIdleTimer();
-      } else {
-        hideReasonRef.current = null;
-        armIdleTimer();
-      }
-      return next;
-    });
-  }, [armIdleTimer, clearIdleTimer]);
+    hideReasonRef.current = "manual";
+    clearIdleTimer();
+    setChromeHidden((v) => !v);
+  }, [clearIdleTimer]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -335,6 +332,12 @@ export default function Reader({ bookId }: { bookId: string }) {
         lastActivityRef.current = now;
       }
       if (hideReasonRef.current === "manual") return;
+      if (
+        chromeHiddenRef.current &&
+        (e.type === "pointerdown" || e.type === "touchstart")
+      ) {
+        return;
+      }
       setChromeHidden((cur) => {
         if (cur) {
           hideReasonRef.current = null;

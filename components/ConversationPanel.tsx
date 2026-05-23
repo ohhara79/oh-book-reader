@@ -1682,6 +1682,8 @@ export default function ConversationPanel({
             void addFiles(files);
           }}
           className={`border-t px-2 py-1 transition-colors print:hidden ${
+            chromeHidden ? "hidden" : ""
+          } ${
             dragActive
               ? "border-zinc-400 bg-zinc-50 dark:border-zinc-500 dark:bg-zinc-900/60"
               : "border-zinc-200 dark:border-zinc-800"

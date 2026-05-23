@@ -318,10 +318,18 @@ export default function Reader({ bookId }: { bookId: string }) {
   }, [clearIdleTimer]);
 
   const toggleChrome = useCallback(() => {
-    hideReasonRef.current = "manual";
-    clearIdleTimer();
-    setChromeHidden((v) => !v);
-  }, [clearIdleTimer]);
+    setChromeHidden((v) => {
+      const next = !v;
+      if (next) {
+        hideReasonRef.current = "manual";
+        clearIdleTimer();
+      } else {
+        hideReasonRef.current = null;
+        armIdleTimer();
+      }
+      return next;
+    });
+  }, [armIdleTimer, clearIdleTimer]);
 
   useEffect(() => {
     if (!hydrated) return;

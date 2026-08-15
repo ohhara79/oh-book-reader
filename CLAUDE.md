@@ -21,9 +21,10 @@ All persistence is filesystem; `lib/store.ts` is the source of truth. Per-book s
 
 ## Claude integration
 
-- Uses `@anthropic-ai/claude-agent-sdk`, **not** `@anthropic-ai/sdk`. There is no API-key path — the SDK spawns a `claude` CLI binary and auth is the OAuth session cached in `~/.claude/` via `claude login`.
-- Binary resolution lives in `lib/claude.ts:30-57`: `CLAUDE_CODE_PATH` env → bundled glibc/musl SDK binary → `which claude`. `CLAUDE_CODE_PATH` overrides this chain.
-- `askClaude` is an async generator yielding `session | delta | usage | done | error` events (`lib/claude.ts:86-91`). Session IDs are reused via the `resume` option to continue a thread.
+- Uses `@anthropic-ai/claude-agent-sdk`, **not** `@anthropic-ai/sdk`. There is no API-key path — the SDK spawns a `claude` CLI binary and auth is the OAuth session cached in `~/.claude/` via `claude login`. (`@anthropic-ai/sdk` and `@modelcontextprotocol/sdk` *are* in `package.json`, but only because the agent SDK declares them as peer dependencies — no app code imports them.)
+- Binary resolution is the SDK's own (it picks the right glibc/musl variant since 0.3). `executableOptions()` in `lib/claude.ts` only layers on the `CLAUDE_CODE_PATH` override, which the SDK itself does not read. Don't reintroduce a hand-rolled resolver or the old stdin wrapper — see `docs/plans/2026-08-15-01-upgrade-agent-sdk-opus-5.md` for why both were removed.
+- `askClaude` is an async generator yielding `session | delta | usage | done | error` events. Session IDs are reused via the `resume` option to continue a thread.
+- The Q&A model is `MODEL_NAME` in `lib/contextWindows.ts` (one place — the context gauge reads it too); thread titles use a separate `TITLE_MODEL` in `lib/claude.ts`.
 
 ## Design-doc trail
 

@@ -1,6 +1,3 @@
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
-import path from "node:path";
 import {
   query,
   type Options,
@@ -36,75 +33,17 @@ natural. Be concise.`;
 
 import { MODEL_NAME } from "./contextWindows";
 
-// Workaround for @anthropic-ai/claude-agent-sdk resolving its bundled musl
-// binary first on Linux even on glibc hosts (function `N7` in sdk.mjs): we
-// pick the matching libc variant ourselves so glibc users don't need to set
-// CLAUDE_CODE_PATH.
-function resolveClaudeExecutable(): string | undefined {
-  if (process.env.CLAUDE_CODE_PATH) return process.env.CLAUDE_CODE_PATH;
-  if (process.platform !== "linux") return undefined;
-
-  const report = process.report.getReport() as {
-    header?: { glibcVersionRuntime?: string };
-  };
-  const isGlibc = Boolean(report.header?.glibcVersionRuntime);
-  const pkg = isGlibc
-    ? `@anthropic-ai/claude-agent-sdk-linux-${process.arch}`
-    : `@anthropic-ai/claude-agent-sdk-linux-${process.arch}-musl`;
-
-  const nodeRequire = createRequire(import.meta.url);
-  // Detach `resolve` so Turbopack's static analyzer doesn't trace this as a
-  // require.resolve call — its `turbopackIgnore` magic comment doesn't suppress
-  // the dynamic-argument warning for require.resolve as of Next 16.2.
-  const resolveFn = nodeRequire.resolve.bind(nodeRequire);
-  try {
-    return resolveFn(`${pkg}/claude`);
-  } catch {}
-
-  try {
-    const out = execFileSync("which", ["claude"], { encoding: "utf8" }).trim();
-    if (out) return out;
-  } catch {}
-
-  return undefined;
-}
-
-const RESOLVED_CLAUDE_PATH = resolveClaudeExecutable();
-
-// The bundled `claude` binary's Bun stdin reader has two separate
-// "Unterminated string" parse-error bugs: one when fed by Node's
-// child_process pipe (lines ~220-280 KB after the SDK's initialize
-// control_request), and another when fed from a regular file FD
-// (lines ~280-300 KB). A kernel pipe sourced from `cat` parses every
-// size we tested, so the wrapper at bin/claude-buffered-stdin.sh
-// drains Node's stdin into a tempfile and pipes that file back into
-// the real binary via another `cat`. See
-// docs/plans/2026-05-12-05-claude-stdin-wrapper.md.
-function resolveStdinWrapper():
-  | { wrapper: string; real: string }
-  | undefined {
-  if (!RESOLVED_CLAUDE_PATH) return undefined;
-  if (process.platform === "win32") return undefined;
-  const wrapper = path.resolve(process.cwd(), "bin/claude-buffered-stdin.sh");
-  return { wrapper, real: RESOLVED_CLAUDE_PATH };
-}
-
-const STDIN_WRAPPER = resolveStdinWrapper();
-
-function executableOptions(): Pick<
-  Options,
-  "pathToClaudeCodeExecutable" | "env"
-> {
-  if (STDIN_WRAPPER) {
-    return {
-      pathToClaudeCodeExecutable: STDIN_WRAPPER.wrapper,
-      env: { ...process.env, CLAUDE_REAL_BIN: STDIN_WRAPPER.real },
-    };
-  }
-  if (RESOLVED_CLAUDE_PATH) {
-    return { pathToClaudeCodeExecutable: RESOLVED_CLAUDE_PATH };
-  }
-  return {};
+// SDK >= 0.3 resolves its own bundled binary correctly: it picks the musl
+// variant only when the host actually lacks glibc, and its Bun stdin reader no
+// longer mangles large payloads. Both of those used to need workarounds here —
+// a hand-rolled glibc/musl resolver and a `cat`-based stdin wrapper — which
+// were removed in docs/plans/2026-08-15-01-upgrade-agent-sdk-opus-5.md.
+//
+// The SDK does not read CLAUDE_CODE_PATH itself, so we keep honouring it as the
+// documented escape hatch for hosts where no bundled binary is installable.
+function executableOptions(): Pick<Options, "pathToClaudeCodeExecutable"> {
+  const override = process.env.CLAUDE_CODE_PATH;
+  return override ? { pathToClaudeCodeExecutable: override } : {};
 }
 
 const BASE_OPTIONS: Options = {

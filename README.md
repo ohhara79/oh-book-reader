@@ -26,7 +26,7 @@ npm install
 
 ### Optional: `.env.local`
 
-The app finds the `claude` binary automatically — first via the bundled glibc/musl SDK binaries, then via `which claude` (see `lib/claude.ts:30-57`). You only need `.env.local` in the rare case that resolution fails and `npm run dev` reports `Claude Code native binary not found`. Then create `.env.local` pointing at your `claude` executable:
+The SDK finds its own bundled `claude` binary, picking the right glibc/musl build for your host. You only need `.env.local` in the rare case that resolution fails and `npm run dev` reports `Claude Code native binary not found` — for example on a platform with no bundled binary. Then create `.env.local` pointing at your `claude` executable:
 
 ```bash
 # .env.local
